@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import session from 'express-session';
 import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";

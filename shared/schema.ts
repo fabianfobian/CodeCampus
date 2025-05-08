@@ -2,6 +2,8 @@ import { pgTable, text, serial, integer, boolean, timestamp, jsonb, pgEnum } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
+import dotenv from 'dotenv';
+dotenv.config();
 
 // Enums
 export const userRoleEnum = pgEnum('user_role', ['super_admin', 'admin', 'examiner', 'learner']);

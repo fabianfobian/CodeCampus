@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { ZodError } from "zod";
 import { insertProblemSchema, insertSubmissionSchema, insertCompetitionSchema, insertProblemTagSchema } from "@shared/schema";
+import dotenv from 'dotenv';
+dotenv.config();
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication and session handling

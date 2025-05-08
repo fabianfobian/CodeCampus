@@ -14,6 +14,9 @@ import {
 import { eq } from "drizzle-orm";
 import { scrypt, randomBytes } from "crypto";
 import { promisify } from "util";
+import dotenv from 'dotenv';
+dotenv.config();
+
 
 // Use Node.js built-in crypto for password hashing
 const scryptAsync = promisify(scrypt);
