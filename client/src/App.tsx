@@ -14,6 +14,7 @@ import SubmissionsPage from "@/pages/submissions-page";
 import UsersPage from "@/pages/admin/users-page";
 import AdminProblemsPage from "@/pages/admin/problems-page";
 import ReportsPage from "@/pages/admin/reports-page";
+import ProfilePage from "@/pages/profile-page";
 
 function Router() {
   return (
@@ -24,6 +25,7 @@ function Router() {
       <ProtectedRoute path="/problem/:id" component={ProblemDetailPage} />
       <ProtectedRoute path="/competitions" component={CompetitionsPage} />
       <ProtectedRoute path="/submissions" component={SubmissionsPage} />
+      <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute 
         path="/admin/users" 
         component={UsersPage} 

@@ -98,21 +98,23 @@ export default function Sidebar() {
       {/* User info section */}
       {user && (
         <div className="p-4 border-b border-sidebar-border">
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-800 font-semibold">
-              {user.displayName
-                ? user.displayName.substring(0, 2)
-                : user.username.substring(0, 2)}
+          <Link href="/profile">
+            <div className="flex items-center space-x-3 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground rounded-lg p-2 -m-2 cursor-pointer transition-colors">
+              <div className="w-10 h-10 rounded-full bg-primary-200 flex items-center justify-center text-primary-800 font-semibold">
+                {user.displayName
+                  ? user.displayName.substring(0, 2)
+                  : user.username.substring(0, 2)}
+              </div>
+              <div>
+                <h3 className="font-medium text-sm">
+                  {user.displayName || user.username}
+                </h3>
+                <span className="text-xs text-sidebar-foreground/60 capitalize">
+                  {user.role}
+                </span>
+              </div>
             </div>
-            <div>
-              <h3 className="font-medium text-sm">
-                {user.displayName || user.username}
-              </h3>
-              <span className="text-xs text-sidebar-foreground/60 capitalize">
-                {user.role}
-              </span>
-            </div>
-          </div>
+          </Link>
         </div>
       )}
 
