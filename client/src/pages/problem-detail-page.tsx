@@ -174,7 +174,7 @@ export default function ProblemDetailPage() {
                         ${problem.difficulty === 'easy' ? 'bg-green-100 text-green-800' : 
                           problem.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'}`}>
-                        {problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}
+                        {problem.difficulty ? problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1) : ''}
                       </span>
                       <span className="text-xs text-slate-500">
                         Acceptance Rate: {problem.acceptanceRate || 0}%
