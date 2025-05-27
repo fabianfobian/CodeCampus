@@ -76,21 +76,18 @@ export default function ProblemDetailPage() {
     setIsRunning(true);
     setShowOutput(true);
     try {
-      // Simulate code execution with sample output
       setOutput("Running code...\n");
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      const response = await apiRequest("POST", "/api/execute", {
+        language,
+        code
+      });
 
-      // Sample output based on language
-      const sampleOutputs = {
-        javascript: "Hello, World!\nundefined\n",
-        python: "Hello, World!\nNone\n",
-        java: "Hello, World!\n",
-        cpp: "Hello, World!\n",
-        c: "Hello, World!\n"
-      };
-
-      const result = sampleOutputs[language as keyof typeof sampleOutputs] || "Code executed successfully!\n";
-      setOutput(prev => prev + result + "\nExecution completed in 1.2s");
+      if (response.success) {
+        setOutput(prev => prev + response.output + "\n\nExecution completed successfully!");
+      } else {
+        setOutput(prev => prev + `Error: ${response.error || response.output}`);
+      }
     } catch (error) {
       console.error("Error running code:", error);
       setOutput(prev => prev + "\nError: Failed to execute code");
@@ -258,7 +255,50 @@ export default function ProblemDetailPage() {
                     ) : (
                       <div className="prose prose-slate max-w-none">
                         {problem.description ? (
-                          <div dangerouslySetInnerHTML={{ __html: problem.description }} />
+                          <div>
+                            <div className="whitespace-pre-wrap">{problem.description}</div>
+                            
+                            {/* Show examples if available */}
+                            {problem.testCases && problem.testCases.length > 0 && (
+                              <div className="mt-6">
+                                <h3 className="text-lg font-semibold mb-3">Examples:</h3>
+                                {problem.testCases.slice(0, 2).map((testCase: any, index: number) => (
+                                  <div key={index} className="mb-4 p-4 bg-slate-50 rounded-lg">
+                                    <h4 className="font-medium mb-2">Example {index + 1}:</h4>
+                                    <div className="mb-2">
+                                      <strong>Input:</strong>
+                                      <pre className="mt-1 p-2 bg-slate-100 rounded text-sm overflow-x-auto">{testCase.input}</pre>
+                                    </div>
+                                    <div className="mb-2">
+                                      <strong>Output:</strong>
+                                      <pre className="mt-1 p-2 bg-slate-100 rounded text-sm overflow-x-auto">{testCase.output}</pre>
+                                    </div>
+                                    {testCase.explanation && (
+                                      <div>
+                                        <strong>Explanation:</strong>
+                                        <p className="mt-1 text-sm text-slate-600">{testCase.explanation}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Show constraints if available */}
+                            {(problem.timeLimit || problem.memoryLimit) && (
+                              <div className="mt-6">
+                                <h3 className="text-lg font-semibold mb-3">Constraints:</h3>
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {problem.timeLimit && (
+                                    <li>Time Limit: {problem.timeLimit}ms</li>
+                                  )}
+                                  {problem.memoryLimit && (
+                                    <li>Memory Limit: {problem.memoryLimit}MB</li>
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
                         ) : (
                           <div className="text-slate-500">
                             <p>Problem description is loading...</p>

@@ -832,6 +832,48 @@ export class DatabaseStorage implements IStorage {
           command = `timeout ${timeout} ruby ${filepath}`;
           break;
 
+        case "swift":
+          filepath = path.join(tempDir, `${filename}.swift`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} swift ${filename}.swift`;
+          break;
+
+        case "kotlin":
+          filepath = path.join(tempDir, `${filename}.kt`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} kotlinc ${filename}.kt -include-runtime -d ${filename}.jar && timeout ${timeout} java -jar ${filename}.jar`;
+          break;
+
+        case "dart":
+          filepath = path.join(tempDir, `${filename}.dart`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} dart run ${filepath}`;
+          break;
+
+        case "scala":
+          filepath = path.join(tempDir, `${filename}.scala`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} scala ${filename}.scala`;
+          break;
+
+        case "perl":
+          filepath = path.join(tempDir, `${filename}.pl`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} perl ${filepath}`;
+          break;
+
+        case "objective-c":
+          filepath = path.join(tempDir, `${filename}.m`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} clang -framework Foundation ${filename}.m -o ${filename} && timeout ${timeout} ./${filename}`;
+          break;
+
+        case "fsharp":
+          filepath = path.join(tempDir, `${filename}.fs`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} fsharpc ${filename}.fs -o ${filename}.exe && timeout ${timeout} mono ${filename}.exe`;
+          break;
+
         default:
           return {
             output: `Language '${language}' is not supported for execution in this environment`,

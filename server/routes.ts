@@ -12,7 +12,6 @@ import { authenticateUser, requireAuth } from "./auth";
 import { getDbConnection } from "@db";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import { executeCode } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication and session handling
@@ -375,7 +374,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Language and code are required" });
       }
 
-      const result = await executeCode(language, code);
+      const result = await storage.executeCode(language, code);
       res.json(result);
     } catch (error) {
       console.error("Error executing code:", error);
@@ -387,25 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create submission
-  app.post("/api/submissions", requireAuth, async (req, res) => {
-    try {
-      const { problemId, language, code, status } = req.body;
-
-      const newSubmission = await db.insert(submissions).values({
-        userId: req.user!.id,
-        problemId,
-        language,
-        code,
-        status: status || "pending"
-      }).returning();
-
-      res.json(newSubmission[0]);
-    } catch (error) {
-      console.error("Error creating submission:", error);
-      res.status(500).json({ message: "Failed to create submission" });
-    }
-  });
+  
 
   return httpServer;
 }
