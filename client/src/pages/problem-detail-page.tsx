@@ -11,7 +11,7 @@ import { Problem } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { SUPPORTED_LANGUAGES, getDefaultCode } from "@/lib/monaco";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Bookmark, HelpCircle, MessageSquare, FileCode, Play, Send, Edit2, Save } from "lucide-react";
+import { ArrowLeft, Bookmark, HelpCircle, MessageSquare, FileCode, Play, Send, Edit2, Save, Terminal } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -29,6 +29,8 @@ export default function ProblemDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
+  const [output, setOutput] = useState("");
+  const [showOutput, setShowOutput] = useState(false);
   const { user } = useAuth();
   
   // Fetch problem details
@@ -73,12 +75,26 @@ export default function ProblemDetailPage() {
 
   const handleRun = async () => {
     setIsRunning(true);
+    setShowOutput(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      alert("Code executed successfully!");
+      // Simulate code execution with sample output
+      setOutput("Running code...\n");
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Sample output based on language
+      const sampleOutputs = {
+        javascript: "Hello, World!\nundefined\n",
+        python: "Hello, World!\nNone\n",
+        java: "Hello, World!\n",
+        cpp: "Hello, World!\n",
+        c: "Hello, World!\n"
+      };
+      
+      const result = sampleOutputs[language as keyof typeof sampleOutputs] || "Code executed successfully!\n";
+      setOutput(prev => prev + result + "\nExecution completed in 1.2s");
     } catch (error) {
       console.error("Error running code:", error);
-      alert("Failed to run code. Please try again.");
+      setOutput(prev => prev + "\nError: Failed to execute code");
     } finally {
       setIsRunning(false);
     }
@@ -286,12 +302,32 @@ export default function ProblemDetailPage() {
                 </div>
                 
                 {/* Code editor area */}
-                <div className="flex-1 overflow-hidden">
-                  <CodeEditor 
-                    language={language}
-                    value={code}
-                    onChange={setCode}
-                  />
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className={`${showOutput ? 'h-2/3' : 'h-full'} overflow-hidden`}>
+                    <CodeEditor 
+                      language={language}
+                      value={code}
+                      onChange={setCode}
+                    />
+                  </div>
+                  
+                  {/* Terminal output */}
+                  {showOutput && (
+                    <div className="h-1/3 border-t border-slate-200 bg-slate-900 text-green-400 font-mono text-sm overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-slate-700 bg-slate-800 flex items-center justify-between">
+                        <span className="text-slate-300">Terminal Output</span>
+                        <button 
+                          onClick={() => setShowOutput(false)}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex-1 p-3 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap">{output}</pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Submit controls */}

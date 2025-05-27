@@ -174,21 +174,22 @@ export class DatabaseStorage implements IStorage {
   async getProblem(id: number) {
     try {
       const problem = await db.query.problems.findFirst({
-        where: eq(schema.problems.id, id),
-        with: {
-          tags: {
-            with: {
-              tag: true
-            }
-          }
-        }
+        where: eq(schema.problems.id, id)
       });
       
       if (!problem) return null;
       
+      // Fetch tags separately to avoid relation issues
+      const problemTags = await db.query.problemTags.findMany({
+        where: eq(schema.problemTags.problemId, id),
+        with: {
+          tag: true
+        }
+      });
+      
       return {
         ...problem,
-        tags: problem.tags.map(pt => pt.tag)
+        tags: problemTags.map(pt => pt.tag)
       };
     } catch (error) {
       console.error("Error in getProblem:", error);

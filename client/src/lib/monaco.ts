@@ -10,12 +10,23 @@ loader.config({
 // Define supported languages
 export const SUPPORTED_LANGUAGES = [
   { id: 'javascript', name: 'JavaScript', extension: 'js' },
+  { id: 'typescript', name: 'TypeScript', extension: 'ts' },
   { id: 'python', name: 'Python', extension: 'py' },
   { id: 'java', name: 'Java', extension: 'java' },
   { id: 'cpp', name: 'C++', extension: 'cpp' },
+  { id: 'c', name: 'C', extension: 'c' },
   { id: 'csharp', name: 'C#', extension: 'cs' },
   { id: 'go', name: 'Go', extension: 'go' },
+  { id: 'rust', name: 'Rust', extension: 'rs' },
   { id: 'ruby', name: 'Ruby', extension: 'rb' },
+  { id: 'php', name: 'PHP', extension: 'php' },
+  { id: 'swift', name: 'Swift', extension: 'swift' },
+  { id: 'kotlin', name: 'Kotlin', extension: 'kt' },
+  { id: 'dart', name: 'Dart', extension: 'dart' },
+  { id: 'scala', name: 'Scala', extension: 'scala' },
+  { id: 'perl', name: 'Perl', extension: 'pl' },
+  { id: 'objective-c', name: 'Objective-C', extension: 'm' },
+  { id: 'fsharp', name: 'F#', extension: 'fs' },
 ];
 
 // Common editor options
@@ -75,6 +86,60 @@ public:
 def two_sum(nums, target)
     # Your code here
 end`,
+  typescript: `function solution(): any {
+    // Write your code here
+    return null;
+}
+
+console.log(solution());`,
+  c: `#include <stdio.h>
+
+int main() {
+    // Write your code here
+    return 0;
+}`,
+  rust: `fn main() {
+    // Write your code here
+}`,
+  php: `<?php
+// Write your code here
+echo "Hello, World!";
+?>`,
+  swift: `import Foundation
+
+// Write your code here
+print("Hello, World!")`,
+  kotlin: `fun main() {
+    // Write your code here
+    println("Hello, World!")
+}`,
+  dart: `void main() {
+    // Write your code here
+    print('Hello, World!');
+}`,
+  scala: `object Main {
+    def main(args: Array[String]): Unit = {
+        // Write your code here
+        println("Hello, World!")
+    }
+}`,
+  perl: `#!/usr/bin/perl
+use strict;
+use warnings;
+
+# Write your code here
+print "Hello, World!\\n";`,
+  'objective-c': `#import <Foundation/Foundation.h>
+
+int main(int argc, const char * argv[]) {
+    @autoreleasepool {
+        // Write your code here
+        NSLog(@"Hello, World!");
+    }
+    return 0;
+}`,
+  fsharp: `// Write your code here
+printfn "Hello, World!"`
 };
 
 // Helper to get language data by ID
