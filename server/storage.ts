@@ -9,6 +9,11 @@ import connectPg from 'connect-pg-simple';
 import { db } from '@db';
 import * as schema from "@shared/schema";
 import { eq, and, desc, asc, sql, isNull, not, like, or } from "drizzle-orm";
+import { exec } from "child_process";
+import { promisify } from "util";
+import fs from "fs/promises";
+import path from "path";
+import crypto from "crypto";
 
 const PostgresSessionStore = connectPg(session);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
@@ -31,7 +36,7 @@ export interface IStorage {
   updateUser: (id: number, data: any) => Promise<any>;
   getAllUsers: () => Promise<any[]>;
   getUsersByRole: (role: string) => Promise<any[]>;
-  
+
   // Problem-related operations
   getProblem: (id: number) => Promise<any>;
   getProblems: (filters?: any) => Promise<any[]>;
@@ -41,13 +46,13 @@ export interface IStorage {
   getProblemTags: () => Promise<any[]>;
   createProblemTag: (tag: any) => Promise<any>;
   addTagToProblem: (problemId: number, tagId: number) => Promise<any>;
-  
+
   // Submission-related operations
   createSubmission: (submission: any) => Promise<any>;
   getUserSubmissions: (userId: number) => Promise<any[]>;
   getProblemSubmissions: (problemId: number) => Promise<any[]>;
   getSubmission: (id: number) => Promise<any>;
-  
+
   // Competition-related operations
   getCompetitions: () => Promise<any[]>;
   getCompetition: (id: number) => Promise<any>;
@@ -56,7 +61,7 @@ export interface IStorage {
   registerForCompetition: (userId: number, competitionId: number) => Promise<any>;
   getCompetitionLeaderboard: (competitionId: number) => Promise<any[]>;
   getActiveCompetitions: () => Promise<any[]>;
-  
+
   // Stats-related operations
   getUserStats: (userId: number) => Promise<any>;
   updateUserStats: (userId: number, stats: any) => Promise<any>;
@@ -66,7 +71,12 @@ export interface IStorage {
 
   // Session store
   sessionStore: SessionStore;
+
+  // Code execution
+  executeCode: (language: string, code: string) => Promise<{ output: string; error?: string; success: boolean }>;
 }
+
+const execAsync = promisify(exec);
 
 export class DatabaseStorage implements IStorage {
   sessionStore: SessionStore;
@@ -176,9 +186,9 @@ export class DatabaseStorage implements IStorage {
       const problem = await db.query.problems.findFirst({
         where: eq(schema.problems.id, id)
       });
-      
+
       if (!problem) return null;
-      
+
       // Fetch tags separately to avoid relation issues
       const problemTags = await db.query.problemTags.findMany({
         where: eq(schema.problemTags.problemId, id),
@@ -186,7 +196,7 @@ export class DatabaseStorage implements IStorage {
           tag: true
         }
       });
-      
+
       return {
         ...problem,
         tags: problemTags.map(pt => pt.tag)
@@ -200,20 +210,20 @@ export class DatabaseStorage implements IStorage {
   async getProblems(filters: any = {}) {
     try {
       let query = db.select().from(schema.problems);
-      
+
       if (filters.difficulty) {
         query = query.where(eq(schema.problems.difficulty, filters.difficulty));
       }
-      
+
       if (filters.search) {
         query = query.where(or(
           like(schema.problems.title, `%${filters.search}%`),
           like(schema.problems.description, `%${filters.search}%`)
         ));
       }
-      
+
       const problems = await query.orderBy(asc(schema.problems.id));
-      
+
       // For each problem, fetch its tags
       const problemsWithTags = await Promise.all(
         problems.map(async (problem) => {
@@ -223,14 +233,14 @@ export class DatabaseStorage implements IStorage {
               tag: true
             }
           });
-          
+
           return {
             ...problem,
             tags: problemTags.map(pt => pt.tag)
           };
         })
       );
-      
+
       return problemsWithTags;
     } catch (error) {
       console.error("Error in getProblems:", error);
@@ -274,11 +284,11 @@ export class DatabaseStorage implements IStorage {
       // Delete problem tags first
       await db.delete(schema.problemToTag)
         .where(eq(schema.problemToTag.problemId, id));
-      
+
       // Delete the problem
       const result = await db.delete(schema.problems)
         .where(eq(schema.problems.id, id));
-      
+
       return result.count > 0;
     } catch (error) {
       console.error("Error in deleteProblem:", error);
@@ -331,14 +341,14 @@ export class DatabaseStorage implements IStorage {
           createdAt: new Date()
         })
         .returning();
-      
+
       // Update user stats after submission
       await this.updateUserStatsAfterSubmission(
         submission.userId,
         submission.problemId,
         submission.status === 'accepted'
       );
-      
+
       return submission;
     } catch (error) {
       console.error("Error in createSubmission:", error);
@@ -412,9 +422,9 @@ export class DatabaseStorage implements IStorage {
       const competition = await db.query.competitions.findFirst({
         where: eq(schema.competitions.id, id)
       });
-      
+
       if (!competition) return null;
-      
+
       // Get problems in this competition
       const competitionProblems = await db.query.competitionProblems.findMany({
         where: eq(schema.competitionProblems.competitionId, id),
@@ -422,7 +432,7 @@ export class DatabaseStorage implements IStorage {
           problem: true
         }
       });
-      
+
       return {
         ...competition,
         problems: competitionProblems.map(cp => ({
@@ -493,7 +503,7 @@ export class DatabaseStorage implements IStorage {
           user: true
         }
       });
-      
+
       // Update ranks based on the sorted order
       return participants.map((participant, index) => ({
         ...participant,
@@ -528,9 +538,9 @@ export class DatabaseStorage implements IStorage {
       const stats = await db.query.userStats.findFirst({
         where: eq(schema.userStats.userId, userId)
       });
-      
+
       if (stats) return stats;
-      
+
       // Create stats if they don't exist
       const [newStats] = await db.insert(schema.userStats)
         .values({
@@ -549,7 +559,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date()
         })
         .returning();
-      
+
       return newStats;
     } catch (error) {
       console.error("Error in getUserStats:", error);
@@ -563,7 +573,7 @@ export class DatabaseStorage implements IStorage {
       const existingStats = await db.query.userStats.findFirst({
         where: eq(schema.userStats.userId, userId)
       });
-      
+
       if (existingStats) {
         // Update existing stats
         const [updatedStats] = await db.update(schema.userStats)
@@ -573,7 +583,7 @@ export class DatabaseStorage implements IStorage {
           })
           .where(eq(schema.userStats.userId, userId))
           .returning();
-        
+
         return updatedStats;
       } else {
         // Create new stats
@@ -585,7 +595,7 @@ export class DatabaseStorage implements IStorage {
             updatedAt: new Date()
           })
           .returning();
-        
+
         return newStats;
       }
     } catch (error) {
@@ -606,7 +616,7 @@ export class DatabaseStorage implements IStorage {
           user: true
         }
       });
-      
+
       // Update ranks based on the sorted order
       return rankings.map((ranking, index) => ({
         ...ranking,
@@ -642,7 +652,7 @@ export class DatabaseStorage implements IStorage {
           eq(schema.userSkills.tagId, tagId)
         )
       });
-      
+
       if (existingSkill) {
         // Update existing skill
         const [updatedSkill] = await db.update(schema.userSkills)
@@ -655,7 +665,7 @@ export class DatabaseStorage implements IStorage {
             eq(schema.userSkills.tagId, tagId)
           ))
           .returning();
-        
+
         return updatedSkill;
       } else {
         // Create new skill
@@ -668,7 +678,7 @@ export class DatabaseStorage implements IStorage {
             updatedAt: new Date()
           })
           .returning();
-        
+
         return newSkill;
       }
     } catch (error) {
@@ -683,17 +693,17 @@ export class DatabaseStorage implements IStorage {
       // Get user stats
       const userStats = await this.getUserStats(userId);
       if (!userStats) return;
-      
+
       // Get problem details to determine difficulty
       const problem = await this.getProblem(problemId);
       if (!problem) return;
-      
+
       // Update stats
       const updates: any = {
         totalSubmissions: userStats.totalSubmissions + 1,
         lastActivityDate: new Date()
       };
-      
+
       if (isAccepted) {
         // Check if problem was already solved
         const previousSubmissions = await db.query.submissions.findMany({
@@ -705,12 +715,12 @@ export class DatabaseStorage implements IStorage {
           orderBy: desc(schema.submissions.createdAt),
           limit: 2 // Get the most recent accepted submission + the current one
         });
-        
+
         // If this is the first accepted submission for this problem
         if (previousSubmissions.length <= 1) {
           updates.problemsSolved = userStats.problemsSolved + 1;
           updates.acceptedSubmissions = userStats.acceptedSubmissions + 1;
-          
+
           // Update difficulty-specific counts
           if (problem.difficulty === 'easy') {
             updates.easySolved = userStats.easySolved + 1;
@@ -719,11 +729,11 @@ export class DatabaseStorage implements IStorage {
           } else if (problem.difficulty === 'hard') {
             updates.hardSolved = userStats.hardSolved + 1;
           }
-          
+
           // Update streak
           const today = new Date().toDateString();
           const lastActivity = new Date(userStats.lastActivityDate).toDateString();
-          
+
           if (today === lastActivity) {
             // Same day, streak unchanged
           } else if (
@@ -732,7 +742,7 @@ export class DatabaseStorage implements IStorage {
           ) {
             // Next day, increment streak
             updates.currentStreak = userStats.currentStreak + 1;
-            
+
             // Update longest streak if needed
             if (updates.currentStreak > userStats.longestStreak) {
               updates.longestStreak = updates.currentStreak;
@@ -743,11 +753,144 @@ export class DatabaseStorage implements IStorage {
           }
         }
       }
-      
+
       // Update the stats
       await this.updateUserStats(userId, updates);
     } catch (error) {
       console.error("Error in updateUserStatsAfterSubmission:", error);
+    }
+  }
+
+  async executeCode(language: string, code: string): Promise<{ output: string; error?: string; success: boolean }> {
+    const tempDir = "/tmp";
+    const filename = `code_${crypto.randomBytes(8).toString('hex')}`;
+    const timeout = 10; // 10 seconds
+
+    try {
+      let command: string;
+      let filepath: string;
+
+      switch (language) {
+        case "javascript":
+          filepath = path.join(tempDir, `${filename}.js`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} node ${filepath}`;
+          break;
+
+        case "typescript":
+          filepath = path.join(tempDir, `${filename}.ts`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} npx tsx ${filepath}`;
+          break;
+
+        case "python":
+          filepath = path.join(tempDir, `${filename}.py`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} python3 ${filepath}`;
+          break;
+
+        case "java":
+          const className = "Solution";
+          filepath = path.join(tempDir, `${className}.java`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} javac ${className}.java && timeout ${timeout} java ${className}`;
+          break;
+
+        case "cpp":
+          filepath = path.join(tempDir, `${filename}.cpp`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} g++ -o ${filename} ${filename}.cpp && timeout ${timeout} ./${filename}`;
+          break;
+
+        case "c":
+          filepath = path.join(tempDir, `${filename}.c`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} gcc -o ${filename} ${filename}.c && timeout ${timeout} ./${filename}`;
+          break;
+
+        case "go":
+          filepath = path.join(tempDir, `${filename}.go`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} go run ${filename}.go`;
+          break;
+
+        case "rust":
+          filepath = path.join(tempDir, `${filename}.rs`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} rustc ${filename}.rs -o ${filename} && timeout ${timeout} ./${filename}`;
+          break;
+
+        case "php":
+          filepath = path.join(tempDir, `${filename}.php`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} php ${filepath}`;
+          break;
+
+        case "ruby":
+          filepath = path.join(tempDir, `${filename}.rb`);
+          await fs.writeFile(filepath, code);
+          command = `timeout ${timeout} ruby ${filepath}`;
+          break;
+
+        default:
+          return {
+            output: `Language '${language}' is not supported for execution in this environment`,
+            success: false,
+            error: "Unsupported language"
+          };
+      }
+
+      const startTime = Date.now();
+      const { stdout, stderr } = await execAsync(command);
+      const executionTime = Date.now() - startTime;
+
+      // Cleanup files
+      try {
+        await fs.unlink(filepath);
+        // Also cleanup compiled files for Java and C/C++
+        if (language === "java") {
+          try {
+            await fs.unlink(path.join(tempDir, "Solution.class"));
+          } catch {}
+        } else if (language === "cpp" || language === "c") {
+          try {
+            await fs.unlink(path.join(tempDir, filename));
+          } catch {}
+        }
+      } catch (cleanupError) {
+        console.error("Cleanup error:", cleanupError);
+      }
+
+      const hasOutput = stdout && stdout.trim().length > 0;
+      const hasError = stderr && stderr.trim().length > 0;
+
+      return {
+        output: hasOutput ? stdout.trim() : (hasError ? stderr.trim() : "No output"),
+        success: !hasError,
+        error: hasError ? stderr.trim() : undefined
+      };
+
+    } catch (error: any) {
+      console.error("Code execution error:", error);
+
+      // Cleanup on error
+      try {
+        const filepath = path.join(tempDir, `${filename}.*`);
+        await execAsync(`rm -f ${filepath}`);
+      } catch {}
+
+      let errorMessage = "Execution failed";
+      if (error.message.includes("timeout")) {
+        errorMessage = "Code execution timed out (10 seconds limit)";
+      } else if (error.message.includes("Command failed")) {
+        errorMessage = "Compilation or runtime error";
+      }
+
+      return {
+        output: error.stdout || errorMessage,
+        success: false,
+        error: error.stderr || error.message
+      };
     }
   }
 }

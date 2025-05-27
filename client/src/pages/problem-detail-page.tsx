@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
@@ -32,7 +31,7 @@ export default function ProblemDetailPage() {
   const [output, setOutput] = useState("");
   const [showOutput, setShowOutput] = useState(false);
   const { user } = useAuth();
-  
+
   // Fetch problem details
   const { data: problem, isLoading } = useQuery<Problem>({
     queryKey: ["/api/problems", id],
@@ -80,7 +79,7 @@ export default function ProblemDetailPage() {
       // Simulate code execution with sample output
       setOutput("Running code...\n");
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Sample output based on language
       const sampleOutputs = {
         javascript: "Hello, World!\nundefined\n",
@@ -89,7 +88,7 @@ export default function ProblemDetailPage() {
         cpp: "Hello, World!\n",
         c: "Hello, World!\n"
       };
-      
+
       const result = sampleOutputs[language as keyof typeof sampleOutputs] || "Code executed successfully!\n";
       setOutput(prev => prev + result + "\nExecution completed in 1.2s");
     } catch (error) {
@@ -102,7 +101,7 @@ export default function ProblemDetailPage() {
 
   const handleSubmit = async () => {
     if (!problem) return;
-    
+
     setIsSubmitting(true);
     try {
       const response = await apiRequest("POST", "/api/submissions", {
@@ -111,7 +110,7 @@ export default function ProblemDetailPage() {
         code,
         status: "pending"
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
       alert("Solution submitted successfully!");
     } catch (error) {
@@ -159,10 +158,10 @@ export default function ProblemDetailPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto bg-slate-50">
           <div className="h-full flex flex-col">
             {/* Problem navigation header */}
@@ -244,24 +243,33 @@ export default function ProblemDetailPage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Main problem interface */}
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-1 min-h-0">
               {/* Left panel - Problem description */}
               <div className="bg-white rounded-bl-lg shadow-sm border border-slate-200 overflow-y-auto">
                 <div className="p-6">
-                  {isEditing ? (
-                    <Textarea
-                      value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      className="min-h-[400px] font-mono"
-                    />
-                  ) : (
-                    <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: problem.description }} />
-                  )}
-                </div>
+                    {isEditing ? (
+                      <Textarea
+                        value={editedDescription}
+                        onChange={(e) => setEditedDescription(e.target.value)}
+                        className="min-h-[400px] font-mono"
+                      />
+                    ) : (
+                      <div className="prose prose-slate max-w-none">
+                        {problem.description ? (
+                          <div dangerouslySetInnerHTML={{ __html: problem.description }} />
+                        ) : (
+                          <div className="text-slate-500">
+                            <p>Problem description is loading...</p>
+                            <p className="mt-4">If you're seeing this message, there might be a database connectivity issue. Please check the server logs.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
               </div>
-              
+
               {/* Right panel - Code editor */}
               <div className="bg-white rounded-br-lg shadow-sm border border-slate-200 flex flex-col">
                 {/* Editor toolbar */}
@@ -300,7 +308,7 @@ export default function ProblemDetailPage() {
                     </Button>
                   </div>
                 </div>
-                
+
                 {/* Code editor area */}
                 <div className="flex-1 overflow-hidden flex flex-col">
                   <div className={`${showOutput ? 'h-2/3' : 'h-full'} overflow-hidden`}>
@@ -310,7 +318,7 @@ export default function ProblemDetailPage() {
                       onChange={setCode}
                     />
                   </div>
-                  
+
                   {/* Terminal output */}
                   {showOutput && (
                     <div className="h-1/3 border-t border-slate-200 bg-slate-900 text-green-400 font-mono text-sm overflow-hidden flex flex-col">
@@ -329,7 +337,7 @@ export default function ProblemDetailPage() {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Submit controls */}
                 <div className="p-3 border-t border-slate-200 flex items-center justify-between">
                   <div className="flex items-center text-xs text-slate-500 space-x-3">

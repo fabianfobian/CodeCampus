@@ -6,6 +6,13 @@ import { ZodError } from "zod";
 import { insertProblemSchema, insertSubmissionSchema, insertCompetitionSchema, insertProblemTagSchema } from "@shared/schema";
 import dotenv from 'dotenv';
 dotenv.config();
+import { insertUserSchema, users, problems, problemTags, submissions, competitions, type SelectUser } from "@shared/schema";
+import { desc, eq, and, sql, count, avg } from "drizzle-orm";
+import { authenticateUser, requireAuth } from "./auth";
+import { getDbConnection } from "@db";
+import { hash } from "bcryptjs";
+import { z } from "zod";
+import { executeCode } from "./storage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication and session handling
@@ -55,11 +62,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const problem = await storage.getProblem(Number(id));
-      
+
       if (!problem) {
         return res.status(404).json({ message: "Problem not found" });
       }
-      
+
       res.json(problem);
     } catch (error) {
       console.error(`Error fetching problem ${req.params.id}:`, error);
@@ -71,22 +78,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.authorize(['super_admin', 'admin', 'examiner'])(req, res, async () => {
       try {
         const problemData = insertProblemSchema.parse(req.body);
-        
+
         // Add the user as creator
         const data = {
           ...problemData,
           createdBy: req.user.id
         };
-        
+
         const problem = await storage.createProblem(data);
-        
+
         // Add tags if provided
         if (req.body.tags && Array.isArray(req.body.tags)) {
           for (const tagId of req.body.tags) {
             await storage.addTagToProblem(problem.id, tagId);
           }
         }
-        
+
         res.status(201).json(problem);
       } catch (error) {
         if (error instanceof ZodError) {
@@ -104,11 +111,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const problemData = req.body;
         const updatedProblem = await storage.updateProblem(Number(id), problemData);
-        
+
         if (!updatedProblem) {
           return res.status(404).json({ message: "Problem not found" });
         }
-        
+
         res.json(updatedProblem);
       } catch (error) {
         console.error(`Error updating problem ${id}:`, error);
@@ -122,11 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.authorize(['super_admin', 'admin'])(req, res, async () => {
       try {
         const success = await storage.deleteProblem(Number(id));
-        
+
         if (!success) {
           return res.status(404).json({ message: "Problem not found" });
         }
-        
+
         res.status(204).send();
       } catch (error) {
         console.error(`Error deleting problem ${id}:`, error);
@@ -167,13 +174,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
+
     try {
       const submissionData = insertSubmissionSchema.parse({
         ...req.body,
         userId: req.user.id
       });
-      
+
       const submission = await storage.createSubmission(submissionData);
       res.status(201).json(submission);
     } catch (error) {
@@ -189,9 +196,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
+
     const userId = req.user.role === 'learner' ? req.user.id : req.query.userId;
-    
+
     try {
       const submissions = await storage.getUserSubmissions(Number(userId));
       res.json(submissions);
@@ -237,11 +244,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const competition = await storage.getCompetition(Number(id));
-      
+
       if (!competition) {
         return res.status(404).json({ message: "Competition not found" });
       }
-      
+
       res.json(competition);
     } catch (error) {
       console.error(`Error fetching competition ${req.params.id}:`, error);
@@ -256,7 +263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...req.body,
           createdBy: req.user.id
         });
-        
+
         const competition = await storage.createCompetition(competitionData);
         res.status(201).json(competition);
       } catch (error) {
@@ -274,17 +281,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     req.authorize(['super_admin', 'admin', 'examiner'])(req, res, async () => {
       try {
         const { problemId, points } = req.body;
-        
+
         if (!problemId || !points) {
           return res.status(400).json({ message: "Problem ID and points are required" });
         }
-        
+
         const competitionProblem = await storage.addProblemToCompetition(
           Number(id), 
           Number(problemId), 
           Number(points)
         );
-        
+
         res.status(201).json(competitionProblem);
       } catch (error) {
         console.error(`Error adding problem to competition ${id}:`, error);
@@ -297,9 +304,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.isAuthenticated()) {
       return res.status(401).json({ message: "Authentication required" });
     }
-    
+
     const { id } = req.params;
-    
+
     try {
       const registration = await storage.registerForCompetition(req.user.id, Number(id));
       res.status(201).json(registration);
@@ -325,11 +332,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       const stats = await storage.getUserStats(Number(id));
-      
+
       if (!stats) {
         return res.status(404).json({ message: "User stats not found" });
       }
-      
+
       res.json(stats);
     } catch (error) {
       console.error(`Error fetching stats for user ${req.params.id}:`, error);
@@ -356,6 +363,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching leaderboard:", error);
       res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Execute code
+  app.post("/api/execute", requireAuth, async (req, res) => {
+    try {
+      const { language, code } = req.body;
+
+      if (!language || !code) {
+        return res.status(400).json({ message: "Language and code are required" });
+      }
+
+      const result = await executeCode(language, code);
+      res.json(result);
+    } catch (error) {
+      console.error("Error executing code:", error);
+      res.status(500).json({ 
+        message: "Failed to execute code",
+        output: "Error: Code execution failed",
+        success: false
+      });
+    }
+  });
+
+  // Create submission
+  app.post("/api/submissions", requireAuth, async (req, res) => {
+    try {
+      const { problemId, language, code, status } = req.body;
+
+      const newSubmission = await db.insert(submissions).values({
+        userId: req.user!.id,
+        problemId,
+        language,
+        code,
+        status: status || "pending"
+      }).returning();
+
+      res.json(newSubmission[0]);
+    } catch (error) {
+      console.error("Error creating submission:", error);
+      res.status(500).json({ message: "Failed to create submission" });
     }
   });
 
