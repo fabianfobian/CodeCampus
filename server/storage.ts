@@ -8,7 +8,6 @@ import { Pool } from 'pg';
 import connectPg from 'connect-pg-simple';
 import { db } from '@db';
 import * as schema from "@shared/schema";
-import { insertUserSchema, users, problems, problemTags, submissions, competitions, userCompetitions, competitionProblems, userStats, userSkills, problemToTag, discussions, discussionReplies, discussionLikes, discussionReplyLikes, type SelectUser } from "@shared/schema";
 import { eq, and, desc, asc, sql, isNull, not, like, or } from "drizzle-orm";
 import { exec } from "child_process";
 import { promisify } from "util";
@@ -75,14 +74,6 @@ export interface IStorage {
 
   // Code execution
   executeCode: (language: string, code: string) => Promise<{ output: string; error?: string; success: boolean }>;
-
-  // Discussions
-  getDiscussions(filters: any): Promise<any>;
-  getDiscussion(id: number): Promise<any>;
-  createDiscussion(data: any): Promise<any>;
-  getDiscussionReplies(discussionId: number): Promise<any>;
-  createDiscussionReply(data: any): Promise<any>;
-  toggleDiscussionLike(discussionId: number, userId: number): Promise<any>;
 }
 
 const execAsync = promisify(exec);
@@ -696,195 +687,80 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Discussions
-  async getDiscussions(filters: any = {}) {
+  // Helper methods
+  private async updateUserStatsAfterSubmission(userId: number, problemId: number, isAccepted: boolean) {
     try {
-      let query = db
-        .select({
-          id: discussions.id,
-          title: discussions.title,
-          content: discussions.content,
-          category: discussions.category,
-          tags: discussions.tags,
-          isPinned: discussions.isPinned,
-          views: discussions.views,
-          createdAt: discussions.createdAt,
-          updatedAt: discussions.updatedAt,
-          author: {
-            id: users.id,
-            username: users.username,
-            displayName: users.displayName,
-          },
-          replyCount: sql<number>`(
-            SELECT COUNT(*)::int 
-            FROM ${discussionReplies} 
-            WHERE ${discussionReplies.discussionId} = ${discussions.id}
-          )`,
-          likeCount: sql<number>`(
-            SELECT COUNT(*)::int 
-            FROM ${discussionLikes} 
-            WHERE ${discussionLikes.discussionId} = ${discussions.id}
-          )`
-        })
-        .from(discussions)
-        .leftJoin(users, eq(discussions.authorId, users.id));
+      // Get user stats
+      const userStats = await this.getUserStats(userId);
+      if (!userStats) return;
 
-      if (filters.category && filters.category !== 'All Categories') {
-        query = query.where(eq(discussions.category, filters.category));
+      // Get problem details to determine difficulty
+      const problem = await this.getProblem(problemId);
+      if (!problem) return;
+
+      // Update stats
+      const updates: any = {
+        totalSubmissions: userStats.totalSubmissions + 1,
+        lastActivityDate: new Date()
+      };
+
+      if (isAccepted) {
+        // Check if problem was already solved
+        const previousSubmissions = await db.query.submissions.findMany({
+          where: and(
+            eq(schema.submissions.userId, userId),
+            eq(schema.submissions.problemId, problemId),
+            eq(schema.submissions.status, 'accepted')
+          ),
+          orderBy: desc(schema.submissions.createdAt),
+          limit: 2 // Get the most recent accepted submission + the current one
+        });
+
+        // If this is the first accepted submission for this problem
+        if (previousSubmissions.length <= 1) {
+          updates.problemsSolved = userStats.problemsSolved + 1;
+          updates.acceptedSubmissions = userStats.acceptedSubmissions + 1;
+
+          // Update difficulty-specific counts
+          if (problem.difficulty === 'easy') {
+            updates.easySolved = userStats.easySolved + 1;
+          } else if (problem.difficulty === 'medium') {
+            updates.mediumSolved = userStats.mediumSolved + 1;
+          } else if (problem.difficulty === 'hard') {
+            updates.hardSolved = userStats.hardSolved + 1;
+          }
+
+          // Update streak
+          const today = new Date().toDateString();
+          const lastActivity = new Date(userStats.lastActivityDate).toDateString();
+
+          if (today === lastActivity) {
+            // Same day, streak unchanged
+          } else if (
+            new Date(today).getTime() - new Date(lastActivity).getTime() <=
+            86400000 // 1 day in milliseconds
+          ) {
+            // Next day, increment streak
+            updates.currentStreak = userStats.currentStreak + 1;
+
+            // Update longest streak if needed
+            if (updates.currentStreak > userStats.longestStreak) {
+              updates.longestStreak = updates.currentStreak;
+            }
+          } else {
+            // Streak broken
+            updates.currentStreak = 1;
+          }
+        }
       }
 
-      if (filters.search) {
-        query = query.where(
-          sql`${discussions.title} ILIKE ${'%' + filters.search + '%'} OR 
-              ${discussions.content} ILIKE ${'%' + filters.search + '%'}`
-        );
-      }
-
-      return await query.orderBy(desc(discussions.isPinned), desc(discussions.updatedAt));
+      // Update the stats
+      await this.updateUserStats(userId, updates);
     } catch (error) {
-      console.error("Error fetching discussions:", error);
-      throw error;
+      console.error("Error in updateUserStatsAfterSubmission:", error);
     }
   }
 
-  async getDiscussion(id: number) {
-    try {
-      const result = await db
-        .select({
-          id: discussions.id,
-          title: discussions.title,
-          content: discussions.content,
-          category: discussions.category,
-          tags: discussions.tags,
-          isPinned: discussions.isPinned,
-          views: discussions.views,
-          createdAt: discussions.createdAt,
-          updatedAt: discussions.updatedAt,
-          author: {
-            id: users.id,
-            username: users.username,
-            displayName: users.displayName,
-          },
-          replyCount: sql<number>`(
-            SELECT COUNT(*)::int 
-            FROM ${discussionReplies} 
-            WHERE ${discussionReplies.discussionId} = ${discussions.id}
-          )`,
-          likeCount: sql<number>`(
-            SELECT COUNT(*)::int 
-            FROM ${discussionLikes} 
-            WHERE ${discussionLikes.discussionId} = ${discussions.id}
-          )`
-        })
-        .from(discussions)
-        .leftJoin(users, eq(discussions.authorId, users.id))
-        .where(eq(discussions.id, id));
-
-      if (result.length === 0) return null;
-
-      // Increment view count
-      await db
-        .update(discussions)
-        .set({ views: sql`${discussions.views} + 1` })
-        .where(eq(discussions.id, id));
-
-      return result[0];
-    } catch (error) {
-      console.error("Error fetching discussion:", error);
-      throw error;
-    }
-  }
-
-  async createDiscussion(data: any) {
-    try {
-      const result = await db
-        .insert(discussions)
-        .values(data)
-        .returning();
-      return result[0];
-    } catch (error) {
-      console.error("Error creating discussion:", error);
-      throw error;
-    }
-  }
-
-  async getDiscussionReplies(discussionId: number) {
-    try {
-      return await db
-        .select({
-          id: discussionReplies.id,
-          content: discussionReplies.content,
-          parentReplyId: discussionReplies.parentReplyId,
-          createdAt: discussionReplies.createdAt,
-          updatedAt: discussionReplies.updatedAt,
-          author: {
-            id: users.id,
-            username: users.username,
-            displayName: users.displayName,
-          },
-          likeCount: sql<number>`(
-            SELECT COUNT(*)::int 
-            FROM ${discussionReplyLikes} 
-            WHERE ${discussionReplyLikes.replyId} = ${discussionReplies.id}
-          )`
-        })
-        .from(discussionReplies)
-        .leftJoin(users, eq(discussionReplies.authorId, users.id))
-        .where(eq(discussionReplies.discussionId, discussionId))
-        .orderBy(discussionReplies.createdAt);
-    } catch (error) {
-      console.error("Error fetching discussion replies:", error);
-      throw error;
-    }
-  }
-
-  async createDiscussionReply(data: any) {
-    try {
-      const result = await db
-        .insert(discussionReplies)
-        .values(data)
-        .returning();
-      return result[0];
-    } catch (error) {
-      console.error("Error creating discussion reply:", error);
-      throw error;
-    }
-  }
-
-  async toggleDiscussionLike(discussionId: number, userId: number) {
-    try {
-      // Check if user already liked this discussion
-      const existingLike = await db
-        .select()
-        .from(discussionLikes)
-        .where(and(
-          eq(discussionLikes.discussionId, discussionId),
-          eq(discussionLikes.userId, userId)
-        ));
-
-      if (existingLike.length > 0) {
-        // Unlike
-        await db
-          .delete(discussionLikes)
-          .where(and(
-            eq(discussionLikes.discussionId, discussionId),
-            eq(discussionLikes.userId, userId)
-          ));
-        return { liked: false };
-      } else {
-        // Like
-        await db
-          .insert(discussionLikes)
-          .values({ discussionId, userId });
-        return { liked: true };
-      }
-    } catch (error) {
-      console.error("Error toggling discussion like:", error);
-      throw error;
-    }
-  }
-
-  // Execute code
   async executeCode(language: string, code: string): Promise<{ output: string; error?: string; success: boolean }> {
     const tempDir = "/tmp";
     const filename = `code_${crypto.randomBytes(8).toString('hex')}`;
