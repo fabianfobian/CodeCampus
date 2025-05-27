@@ -149,3 +149,11 @@ export function setupAuth(app: Express) {
     next();
   });
 }
+
+// Authentication middleware
+export function requireAuth(req: any, res: any, next: any) {
+  if (!req.isAuthenticated()) {
+    return res.status(401).json({ message: "Authentication required" });
+  }
+  next();
+}

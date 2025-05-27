@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { insertUserSchema, users, problems, problemTags, submissions, competitions, type SelectUser } from "@shared/schema";
 import { desc, eq, and, sql, count, avg } from "drizzle-orm";
-import { authenticateUser, requireAuth } from "./auth";
+import { requireAuth } from "./auth";
 import { getDbConnection } from "@db";
 import { hash } from "bcryptjs";
 import { z } from "zod";
