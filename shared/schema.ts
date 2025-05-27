@@ -165,6 +165,95 @@ export const userCompetitionsRelations = relations(userCompetitions, ({ one }) =
   }),
 }));
 
+// Discussions table
+export const discussions = pgTable("discussions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  category: text("category").notNull(),
+  tags: jsonb("tags").notNull(), // Array of tag strings
+  isPinned: boolean("is_pinned").default(false),
+  views: integer("views").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const discussionsRelations = relations(discussions, ({ one, many }) => ({
+  author: one(users, {
+    fields: [discussions.authorId],
+    references: [users.id],
+  }),
+  replies: many(discussionReplies),
+  likes: many(discussionLikes),
+}));
+
+// Discussion Replies
+export const discussionReplies = pgTable("discussion_replies", {
+  id: serial("id").primaryKey(),
+  discussionId: integer("discussion_id").notNull().references(() => discussions.id),
+  authorId: integer("author_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  parentReplyId: integer("parent_reply_id").references(() => discussionReplies.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const discussionRepliesRelations = relations(discussionReplies, ({ one, many }) => ({
+  discussion: one(discussions, {
+    fields: [discussionReplies.discussionId],
+    references: [discussions.id],
+  }),
+  author: one(users, {
+    fields: [discussionReplies.authorId],
+    references: [users.id],
+  }),
+  parentReply: one(discussionReplies, {
+    fields: [discussionReplies.parentReplyId],
+    references: [discussionReplies.id],
+  }),
+  childReplies: many(discussionReplies),
+  likes: many(discussionReplyLikes),
+}));
+
+// Discussion Likes
+export const discussionLikes = pgTable("discussion_likes", {
+  id: serial("id").primaryKey(),
+  discussionId: integer("discussion_id").notNull().references(() => discussions.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const discussionLikesRelations = relations(discussionLikes, ({ one }) => ({
+  discussion: one(discussions, {
+    fields: [discussionLikes.discussionId],
+    references: [discussions.id],
+  }),
+  user: one(users, {
+    fields: [discussionLikes.userId],
+    references: [users.id],
+  }),
+}));
+
+// Discussion Reply Likes
+export const discussionReplyLikes = pgTable("discussion_reply_likes", {
+  id: serial("id").primaryKey(),
+  replyId: integer("reply_id").notNull().references(() => discussionReplies.id),
+  userId: integer("user_id").notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const discussionReplyLikesRelations = relations(discussionReplyLikes, ({ one }) => ({
+  reply: one(discussionReplies, {
+    fields: [discussionReplyLikes.replyId],
+    references: [discussionReplies.id],
+  }),
+  user: one(users, {
+    fields: [discussionReplyLikes.userId],
+    references: [users.id],
+  }),
+}));
+
 // User Stats (per user statistics)
 export const userStats = pgTable("user_stats", {
   id: serial("id").primaryKey(),

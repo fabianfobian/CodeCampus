@@ -6,7 +6,7 @@ import { ZodError } from "zod";
 import { insertProblemSchema, insertSubmissionSchema, insertCompetitionSchema, insertProblemTagSchema } from "@shared/schema";
 import dotenv from 'dotenv';
 dotenv.config();
-import { insertUserSchema, users, problems, problemTags, submissions, competitions, type SelectUser } from "@shared/schema";
+import { insertUserSchema, users, problems, problemTags, submissions, competitions, discussions, discussionReplies, insertDiscussionSchema, insertDiscussionReplySchema, type SelectUser } from "@shared/schema";
 import { desc, eq, and, sql, count, avg } from "drizzle-orm";
 import { requireAuth } from "./auth";
 import { getDbConnection } from "@db";
@@ -386,7 +386,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+  // Discussions Routes
+  app.get("/api/discussions", async (req: Request, res: Response) => {
+    try {
+      const filters = req.query;
+      const discussions = await storage.getDiscussions(filters);
+      res.json(discussions);
+    } catch (error) {
+      console.error("Error fetching discussions:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/discussions/:id", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const discussion = await storage.getDiscussion(Number(id));
+
+      if (!discussion) {
+        return res.status(404).json({ message: "Discussion not found" });
+      }
+
+      res.json(discussion);
+    } catch (error) {
+      console.error(`Error fetching discussion ${req.params.id}:`, error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/discussions", async (req: any, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+      const discussionData = insertDiscussionSchema.parse({
+        ...req.body,
+        authorId: req.user.id
+      });
+
+      const discussion = await storage.createDiscussion(discussionData);
+      res.status(201).json(discussion);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      console.error("Error creating discussion:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/discussions/:id/replies", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const replies = await storage.getDiscussionReplies(Number(id));
+      res.json(replies);
+    } catch (error) {
+      console.error(`Error fetching replies for discussion ${req.params.id}:`, error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/discussions/:id/replies", async (req: any, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+      const { id } = req.params;
+      const replyData = insertDiscussionReplySchema.parse({
+        ...req.body,
+        discussionId: Number(id),
+        authorId: req.user.id
+      });
+
+      const reply = await storage.createDiscussionReply(replyData);
+      res.status(201).json(reply);
+    } catch (error) {
+      if (error instanceof ZodError) {
+        return res.status(400).json({ errors: error.errors });
+      }
+      console.error("Error creating discussion reply:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/discussions/:id/like", async (req: any, res: Response) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+
+    try {
+      const { id } = req.params;
+      const result = await storage.toggleDiscussionLike(Number(id), req.user.id);
+      res.json(result);
+    } catch (error) {
+      console.error(`Error toggling like for discussion ${req.params.id}:`, error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
 
   return httpServer;
 }
