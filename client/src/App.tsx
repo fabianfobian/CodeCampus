@@ -16,6 +16,7 @@ import AdminProblemsPage from "@/pages/admin/problems-page";
 import ReportsPage from "@/pages/admin/reports-page";
 import ProfilePage from "@/pages/profile-page";
 import LearningPathsPage from "@/pages/learning-paths-page";
+import DiscussionsPage from "@/pages/discussions-page";
 
 function Router() {
   return (
@@ -28,6 +29,7 @@ function Router() {
       <ProtectedRoute path="/submissions" component={SubmissionsPage} />
       <ProtectedRoute path="/profile" component={ProfilePage} />
       <ProtectedRoute path="/learning-paths" component={LearningPathsPage} />
+      <ProtectedRoute path="/discussions" component={DiscussionsPage} />
       <ProtectedRoute 
         path="/admin/users" 
         component={UsersPage} 
