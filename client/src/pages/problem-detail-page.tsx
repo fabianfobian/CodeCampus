@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
@@ -11,7 +10,7 @@ import { Problem } from "@shared/schema";
 import { getQueryFn, apiRequest, queryClient } from "@/lib/queryClient";
 import { SUPPORTED_LANGUAGES, getDefaultCode } from "@/lib/monaco";
 import { useAuth } from "@/hooks/use-auth";
-import { ArrowLeft, Bookmark, HelpCircle, MessageSquare, FileCode, Play, Send, Edit2, Save } from "lucide-react";
+import { ArrowLeft, Bookmark, HelpCircle, MessageSquare, FileCode, Play, Send, Edit2, Save, Terminal } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -29,8 +28,10 @@ export default function ProblemDetailPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState("");
   const [editedDescription, setEditedDescription] = useState("");
+  const [output, setOutput] = useState("");
+  const [showOutput, setShowOutput] = useState(false);
   const { user } = useAuth();
-  
+
   // Fetch problem details
   const { data: problem, isLoading } = useQuery<Problem>({
     queryKey: ["/api/problems", id],
@@ -73,12 +74,23 @@ export default function ProblemDetailPage() {
 
   const handleRun = async () => {
     setIsRunning(true);
+    setShowOutput(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      alert("Code executed successfully!");
+      setOutput("Running code...\n");
+      
+      const response = await apiRequest("POST", "/api/execute", {
+        language,
+        code
+      });
+
+      if (response.success) {
+        setOutput(prev => prev + response.output + "\n\nExecution completed successfully!");
+      } else {
+        setOutput(prev => prev + `Error: ${response.error || response.output}`);
+      }
     } catch (error) {
       console.error("Error running code:", error);
-      alert("Failed to run code. Please try again.");
+      setOutput(prev => prev + "\nError: Failed to execute code");
     } finally {
       setIsRunning(false);
     }
@@ -86,7 +98,7 @@ export default function ProblemDetailPage() {
 
   const handleSubmit = async () => {
     if (!problem) return;
-    
+
     setIsSubmitting(true);
     try {
       const response = await apiRequest("POST", "/api/submissions", {
@@ -95,7 +107,7 @@ export default function ProblemDetailPage() {
         code,
         status: "pending"
       });
-      
+
       queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
       alert("Solution submitted successfully!");
     } catch (error) {
@@ -143,10 +155,10 @@ export default function ProblemDetailPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto bg-slate-50">
           <div className="h-full flex flex-col">
             {/* Problem navigation header */}
@@ -174,7 +186,7 @@ export default function ProblemDetailPage() {
                         ${problem.difficulty === 'easy' ? 'bg-green-100 text-green-800' : 
                           problem.difficulty === 'medium' ? 'bg-yellow-100 text-yellow-800' : 
                           'bg-red-100 text-red-800'}`}>
-                        {problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1)}
+                        {problem.difficulty ? problem.difficulty.charAt(0).toUpperCase() + problem.difficulty.slice(1) : ''}
                       </span>
                       <span className="text-xs text-slate-500">
                         Acceptance Rate: {problem.acceptanceRate || 0}%
@@ -228,24 +240,76 @@ export default function ProblemDetailPage() {
                 </div>
               </div>
             </div>
-            
+
             {/* Main problem interface */}
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-1 min-h-0">
               {/* Left panel - Problem description */}
               <div className="bg-white rounded-bl-lg shadow-sm border border-slate-200 overflow-y-auto">
                 <div className="p-6">
-                  {isEditing ? (
-                    <Textarea
-                      value={editedDescription}
-                      onChange={(e) => setEditedDescription(e.target.value)}
-                      className="min-h-[400px] font-mono"
-                    />
-                  ) : (
-                    <div className="prose prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: problem.description }} />
-                  )}
-                </div>
+                    {isEditing ? (
+                      <Textarea
+                        value={editedDescription}
+                        onChange={(e) => setEditedDescription(e.target.value)}
+                        className="min-h-[400px] font-mono"
+                      />
+                    ) : (
+                      <div className="prose prose-slate max-w-none">
+                        {problem.description ? (
+                          <div>
+                            <div className="whitespace-pre-wrap">{problem.description}</div>
+                            
+                            {/* Show examples if available */}
+                            {problem.testCases && problem.testCases.length > 0 && (
+                              <div className="mt-6">
+                                <h3 className="text-lg font-semibold mb-3">Examples:</h3>
+                                {problem.testCases.slice(0, 2).map((testCase: any, index: number) => (
+                                  <div key={index} className="mb-4 p-4 bg-slate-50 rounded-lg">
+                                    <h4 className="font-medium mb-2">Example {index + 1}:</h4>
+                                    <div className="mb-2">
+                                      <strong>Input:</strong>
+                                      <pre className="mt-1 p-2 bg-slate-100 rounded text-sm overflow-x-auto">{testCase.input}</pre>
+                                    </div>
+                                    <div className="mb-2">
+                                      <strong>Output:</strong>
+                                      <pre className="mt-1 p-2 bg-slate-100 rounded text-sm overflow-x-auto">{testCase.output}</pre>
+                                    </div>
+                                    {testCase.explanation && (
+                                      <div>
+                                        <strong>Explanation:</strong>
+                                        <p className="mt-1 text-sm text-slate-600">{testCase.explanation}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Show constraints if available */}
+                            {(problem.timeLimit || problem.memoryLimit) && (
+                              <div className="mt-6">
+                                <h3 className="text-lg font-semibold mb-3">Constraints:</h3>
+                                <ul className="list-disc pl-5 space-y-1">
+                                  {problem.timeLimit && (
+                                    <li>Time Limit: {problem.timeLimit}ms</li>
+                                  )}
+                                  {problem.memoryLimit && (
+                                    <li>Memory Limit: {problem.memoryLimit}MB</li>
+                                  )}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-slate-500">
+                            <p>Problem description is loading...</p>
+                            <p className="mt-4">If you're seeing this message, there might be a database connectivity issue. Please check the server logs.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
               </div>
-              
+
               {/* Right panel - Code editor */}
               <div className="bg-white rounded-br-lg shadow-sm border border-slate-200 flex flex-col">
                 {/* Editor toolbar */}
@@ -284,16 +348,36 @@ export default function ProblemDetailPage() {
                     </Button>
                   </div>
                 </div>
-                
+
                 {/* Code editor area */}
-                <div className="flex-1 overflow-hidden">
-                  <CodeEditor 
-                    language={language}
-                    value={code}
-                    onChange={setCode}
-                  />
+                <div className="flex-1 overflow-hidden flex flex-col">
+                  <div className={`${showOutput ? 'h-2/3' : 'h-full'} overflow-hidden`}>
+                    <CodeEditor 
+                      language={language}
+                      value={code}
+                      onChange={setCode}
+                    />
+                  </div>
+
+                  {/* Terminal output */}
+                  {showOutput && (
+                    <div className="h-1/3 border-t border-slate-200 bg-slate-900 text-green-400 font-mono text-sm overflow-hidden flex flex-col">
+                      <div className="p-2 border-b border-slate-700 bg-slate-800 flex items-center justify-between">
+                        <span className="text-slate-300">Terminal Output</span>
+                        <button 
+                          onClick={() => setShowOutput(false)}
+                          className="text-slate-400 hover:text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div className="flex-1 p-3 overflow-y-auto">
+                        <pre className="whitespace-pre-wrap">{output}</pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                
+
                 {/* Submit controls */}
                 <div className="p-3 border-t border-slate-200 flex items-center justify-between">
                   <div className="flex items-center text-xs text-slate-500 space-x-3">
