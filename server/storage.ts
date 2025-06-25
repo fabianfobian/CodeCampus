@@ -73,7 +73,7 @@ export interface IStorage {
   sessionStore: SessionStore;
 
   // Code execution
-  executeCode: (language: string, code: string) => Promise<{ output: string; error?: string; success: boolean }>;
+  executeCode: (language: string, code: string) => Promise<{ output: string; error?: string; success: boolean; executionTime?: number }>;
 }
 
 const execAsync = promisify(exec);
@@ -763,26 +763,54 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async executeCode(language: string, code: string): Promise<{ output: string; error?: string; success: boolean }> {
+  async executeCode(language: string, code: string): Promise<{ output: string; error?: string; success: boolean; executionTime?: number }> {
     const tempDir = "/tmp";
-    const filename = `code_${crypto.randomBytes(8).toString('hex')}`;
-    const timeout = 10; // 10 seconds
+    const filename = `code_${Math.random().toString(36).substring(7)}`;
+    const timeout = 10; // 10 seconds timeout
+    let filepath: string;
+    let command: string;
 
     try {
-      let command: string;
-      let filepath: string;
+      // First check if the language runtime is available
+      const languageChecks: Record<string, string> = {
+        "javascript": "node --version",
+        "python": "python3 --version",
+        "java": "javac -version",
+        "cpp": "g++ --version",
+        "c": "gcc --version",
+        "go": "go version",
+        "rust": "rustc --version",
+        "php": "php --version",
+        "ruby": "ruby --version",
+        "csharp": "mcs --version",
+        "typescript": "which ts-node || which tsx",
+        "swift": "swift --version",
+        "kotlin": "kotlinc -version",
+        "dart": "dart --version",
+        "scala": "scala -version",
+        "perl": "perl --version",
+        "objective-c": "clang --version",
+        "fsharp": "fsharpc --help"
+      };
+
+      const checkCommand = languageChecks[language];
+      if (checkCommand) {
+        try {
+          await execAsync(checkCommand);
+        } catch (checkError) {
+          return {
+            output: `${language} runtime is not installed in this environment. Available languages: JavaScript, Python, Java, C, C++`,
+            success: false,
+            error: `${language} runtime not found`
+          };
+        }
+      }
 
       switch (language) {
         case "javascript":
           filepath = path.join(tempDir, `${filename}.js`);
           await fs.writeFile(filepath, code);
           command = `timeout ${timeout} node ${filepath}`;
-          break;
-
-        case "typescript":
-          filepath = path.join(tempDir, `${filename}.ts`);
-          await fs.writeFile(filepath, code);
-          command = `timeout ${timeout} npx tsx ${filepath}`;
           break;
 
         case "python":
@@ -792,10 +820,16 @@ export class DatabaseStorage implements IStorage {
           break;
 
         case "java":
-          const className = "Solution";
-          filepath = path.join(tempDir, `${className}.java`);
-          await fs.writeFile(filepath, code);
-          command = `cd ${tempDir} && timeout ${timeout} javac ${className}.java && timeout ${timeout} java ${className}`;
+          // Java needs special handling for class names
+          const javaCode = code.includes("class Solution") ? code : `
+public class Solution {
+    public static void main(String[] args) {
+        ${code}
+    }
+}`;
+          filepath = path.join(tempDir, "Solution.java");
+          await fs.writeFile(filepath, javaCode);
+          command = `cd ${tempDir} && timeout ${timeout} javac Solution.java && timeout ${timeout} java Solution`;
           break;
 
         case "cpp":
@@ -832,6 +866,19 @@ export class DatabaseStorage implements IStorage {
           filepath = path.join(tempDir, `${filename}.rb`);
           await fs.writeFile(filepath, code);
           command = `timeout ${timeout} ruby ${filepath}`;
+          break;
+
+        case "csharp":
+          filepath = path.join(tempDir, `${filename}.cs`);
+          await fs.writeFile(filepath, code);
+          command = `cd ${tempDir} && timeout ${timeout} mcs ${filename}.cs -out:${filename}.exe && timeout ${timeout} mono ${filename}.exe`;
+          break;
+
+        case "typescript":
+          filepath = path.join(tempDir, `${filename}.ts`);
+          await fs.writeFile(filepath, code);
+          // Try tsx first, then ts-node
+          command = `timeout ${timeout} tsx ${filepath} || timeout ${timeout} ts-node ${filepath}`;
           break;
 
         case "swift":
@@ -878,7 +925,7 @@ export class DatabaseStorage implements IStorage {
 
         default:
           return {
-            output: `Language '${language}' is not supported for execution in this environment`,
+            output: `Language '${language}' is not supported. Supported languages: JavaScript, Python, Java, C, C++, Go, Rust, PHP, Ruby, C#, TypeScript`,
             success: false,
             error: "Unsupported language"
           };
@@ -890,7 +937,9 @@ export class DatabaseStorage implements IStorage {
 
       // Cleanup files
       try {
-        await fs.unlink(filepath);
+        if (filepath) {
+          await fs.unlink(filepath);
+        }
         // Also cleanup compiled files for Java and C/C++
         if (language === "java") {
           try {
@@ -899,6 +948,10 @@ export class DatabaseStorage implements IStorage {
         } else if (language === "cpp" || language === "c") {
           try {
             await fs.unlink(path.join(tempDir, filename));
+          } catch {}
+        } else if (language === "kotlin") {
+          try {
+            await fs.unlink(path.join(tempDir, `${filename}.jar`));
           } catch {}
         }
       } catch (cleanupError) {
@@ -909,9 +962,10 @@ export class DatabaseStorage implements IStorage {
       const hasError = stderr && stderr.trim().length > 0;
 
       return {
-        output: hasOutput ? stdout.trim() : (hasError ? stderr.trim() : "No output"),
-        success: !hasError,
-        error: hasError ? stderr.trim() : undefined
+        output: hasOutput ? stdout.trim() : (hasError ? stderr.trim() : "Program executed successfully (no output)"),
+        success: !hasError || (hasError && hasOutput), // Consider success if there's output even with stderr
+        error: hasError ? stderr.trim() : undefined,
+        executionTime
       };
 
     } catch (error: any) {
@@ -919,21 +973,26 @@ export class DatabaseStorage implements IStorage {
 
       // Cleanup on error
       try {
-        const filepath = path.join(tempDir, `${filename}.*`);
-        await execAsync(`rm -f ${filepath}`);
+        if (filepath) {
+          await fs.unlink(filepath);
+        }
       } catch {}
 
       let errorMessage = "Execution failed";
-      if (error.message.includes("timeout")) {
+      let detailedError = error.message || "Unknown error";
+
+      if (error.message && error.message.includes("timeout")) {
         errorMessage = "Code execution timed out (10 seconds limit)";
-      } else if (error.message.includes("Command failed")) {
+      } else if (error.message && error.message.includes("Command failed")) {
         errorMessage = "Compilation or runtime error";
+      } else if (error.message && error.message.includes("No such file or directory")) {
+        errorMessage = "Runtime not found or file system error";
       }
 
       return {
         output: error.stdout || errorMessage,
         success: false,
-        error: error.stderr || error.message
+        error: error.stderr || detailedError
       };
     }
   }

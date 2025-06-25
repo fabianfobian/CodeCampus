@@ -84,13 +84,15 @@ export default function ProblemDetailPage() {
       });
 
       if (response.success) {
-        setOutput(prev => prev + response.output + "\n\nExecution completed successfully!");
+        const executionTime = response.executionTime ? ` (${response.executionTime}ms)` : "";
+        setOutput(prev => prev + response.output + `\n\nExecution completed successfully!${executionTime}`);
       } else {
         setOutput(prev => prev + `Error: ${response.error || response.output}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error running code:", error);
-      setOutput(prev => prev + "\nError: Failed to execute code");
+      const errorMsg = error.message || "Failed to execute code";
+      setOutput(prev => prev + `\nError: ${errorMsg}`);
     } finally {
       setIsRunning(false);
     }
@@ -110,9 +112,10 @@ export default function ProblemDetailPage() {
 
       queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
       alert("Solution submitted successfully!");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error submitting solution:", error);
-      alert("Failed to submit solution. Please try again.");
+      const errorMsg = error.message || "Failed to submit solution. Please try again.";
+      alert(errorMsg);
     } finally {
       setIsSubmitting(false);
     }

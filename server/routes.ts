@@ -371,17 +371,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { language, code } = req.body;
 
       if (!language || !code) {
-        return res.status(400).json({ message: "Language and code are required" });
+        return res.status(400).json({ 
+          message: "Language and code are required",
+          output: "Error: Missing language or code parameter",
+          success: false
+        });
       }
 
       const result = await storage.executeCode(language, code);
       res.json(result);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error executing code:", error);
       res.status(500).json({ 
         message: "Failed to execute code",
-        output: "Error: Code execution failed",
-        success: false
+        output: `Error: ${error.message || "Code execution failed"}`,
+        success: false,
+        error: error.message || "Internal server error"
       });
     }
   });
