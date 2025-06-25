@@ -690,65 +690,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Helper methods
-  private analyzeComplexity(code: string, language: string): { time: string; space: string } {
-    const codeLines = code.toLowerCase().split('\n');
-    let timeComplexity = "O(n)"; // Default
-    let spaceComplexity = "O(1)"; // Default
-    
-    // Basic pattern matching for complexity analysis
-    const hasNestedLoops = codeLines.some(line => 
-      (line.includes('for') || line.includes('while')) && 
-      codeLines.some(innerLine => 
-        innerLine.includes('for') || innerLine.includes('while')
-      )
-    );
-    
-    const hasRecursion = codeLines.some(line => 
-      line.includes('recursive') || 
-      (language === 'javascript' && line.includes('function') && code.includes('return ' + line.match(/function\s+(\w+)/)?.[1])) ||
-      (language === 'python' && line.includes('def') && code.includes('return ' + line.match(/def\s+(\w+)/)?.[1])) ||
-      (language === 'java' && code.includes('return ' + code.match(/public\s+\w+\s+(\w+)\s*\(/)?.[1]))
-    );
-    
-    const hasSorting = codeLines.some(line => 
-      line.includes('sort') || line.includes('.sorted') || line.includes('collections.sort')
-    );
-    
-    const hasHashMap = codeLines.some(line => 
-      line.includes('map') || line.includes('dict') || line.includes('hashmap') || 
-      line.includes('set') || line.includes('{}') || line.includes('new map')
-    );
-    
-    const hasArray = codeLines.some(line => 
-      line.includes('[]') || line.includes('array') || line.includes('list') || 
-      line.includes('vector') || line.includes('new int[') || line.includes('new array')
-    );
-    
-    // Time complexity analysis
-    if (hasNestedLoops) {
-      timeComplexity = "O(n²)";
-    } else if (hasSorting) {
-      timeComplexity = "O(n log n)";
-    } else if (hasRecursion) {
-      timeComplexity = "O(2^n)"; // Assuming worst case for recursive solutions
-    } else if (codeLines.some(line => line.includes('for') || line.includes('while'))) {
-      timeComplexity = "O(n)";
-    } else {
-      timeComplexity = "O(1)";
-    }
-    
-    // Space complexity analysis
-    if (hasRecursion) {
-      spaceComplexity = "O(n)"; // Stack space for recursion
-    } else if (hasHashMap || hasArray) {
-      spaceComplexity = "O(n)";
-    } else {
-      spaceComplexity = "O(1)";
-    }
-    
-    return { time: timeComplexity, space: spaceComplexity };
-  }
-
   private async updateUserStatsAfterSubmission(userId: number, problemId: number, isAccepted: boolean) {
     try {
       // Get user stats
@@ -822,15 +763,7 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async executeCode(language: string, code: string, testCases?: any[]): Promise<{ 
-    output: string; 
-    error?: string; 
-    success: boolean; 
-    executionTime?: number;
-    status?: 'accepted' | 'wrong_answer' | 'time_limit_exceeded' | 'runtime_error' | 'compilation_error';
-    timeComplexity?: string;
-    spaceComplexity?: string;
-  }> {
+  async executeCode(language: string, code: string): Promise<{ output: string; error?: string; success: boolean; executionTime?: number }> {
     const tempDir = "/tmp";
     const filename = `code_${Math.random().toString(36).substring(7)}`;
     const timeout = 10; // 10 seconds timeout
@@ -1028,32 +961,11 @@ public class Solution {
       const hasOutput = stdout && stdout.trim().length > 0;
       const hasError = stderr && stderr.trim().length > 0;
 
-      const hasOutput = stdout && stdout.trim().length > 0;
-      const hasError = stderr && stderr.trim().length > 0;
-      const success = !hasError || (hasError && hasOutput);
-
-      // Analyze time and space complexity based on code patterns
-      const complexity = this.analyzeComplexity(code, language);
-
-      // Determine status based on execution
-      let status: 'accepted' | 'wrong_answer' | 'time_limit_exceeded' | 'runtime_error' | 'compilation_error' = 'accepted';
-      
-      if (hasError && !hasOutput) {
-        status = 'runtime_error';
-      } else if (executionTime > 5000) { // 5 second threshold
-        status = 'time_limit_exceeded';
-      } else if (success) {
-        status = 'accepted';
-      }
-
       return {
         output: hasOutput ? stdout.trim() : (hasError ? stderr.trim() : "Program executed successfully (no output)"),
-        success,
+        success: !hasError || (hasError && hasOutput), // Consider success if there's output even with stderr
         error: hasError ? stderr.trim() : undefined,
-        executionTime,
-        status,
-        timeComplexity: complexity.time,
-        spaceComplexity: complexity.space
+        executionTime
       };
 
     } catch (error: any) {
@@ -1077,21 +989,10 @@ public class Solution {
         errorMessage = "Runtime not found or file system error";
       }
 
-      let status: 'compilation_error' | 'runtime_error' | 'time_limit_exceeded' = 'runtime_error';
-      
-      if (error.message && error.message.includes("timeout")) {
-        status = 'time_limit_exceeded';
-      } else if (error.message && (error.message.includes("compilation") || error.message.includes("javac") || error.message.includes("gcc"))) {
-        status = 'compilation_error';
-      }
-
       return {
         output: error.stdout || errorMessage,
         success: false,
-        error: error.stderr || detailedError,
-        status,
-        timeComplexity: "Unknown",
-        spaceComplexity: "Unknown"
+        error: error.stderr || detailedError
       };
     }
   }
