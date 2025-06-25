@@ -961,11 +961,21 @@ public class Solution {
       const hasOutput = stdout && stdout.trim().length > 0;
       const hasError = stderr && stderr.trim().length > 0;
 
+      let outputMessage = "";
+      if (hasOutput) {
+        outputMessage = stdout.trim();
+      } else if (hasError) {
+        outputMessage = stderr.trim();
+      } else {
+        outputMessage = `Code executed successfully!\n\nNo console output was generated. This could mean:\n- Your code doesn't contain print/console.log statements\n- Your code is a function that returns a value (try adding print statements)\n- Your code executed but didn't produce visible output\n\nTip: Add console.log() or print() statements to see your results.`;
+      }
+
       return {
-        output: hasOutput ? stdout.trim() : (hasError ? stderr.trim() : "Program executed successfully (no output)"),
-        success: !hasError || (hasError && hasOutput), // Consider success if there's output even with stderr
+        output: outputMessage,
+        success: !hasError || (hasError && hasOutput),
         error: hasError ? stderr.trim() : undefined,
-        executionTime
+        executionTime,
+        complexity: this.analyzeComplexity(code, language)
       };
 
     } catch (error: any) {
@@ -996,8 +1006,65 @@ public class Solution {
       };
     }
   }
+
+  private analyzeComplexity(code: string, language: string): { time: string; space: string; analysis: string } {
+    const codeLines = code.toLowerCase().split('\n');
+    let timeComplexity = "O(1)";
+    let spaceComplexity = "O(1)";
+    let analysis = "Basic operation";
+
+    // Simple heuristic analysis
+    const hasNestedLoops = codeLines.some(line => 
+      (line.includes('for') || line.includes('while')) && 
+      codeLines.some(otherLine => 
+        otherLine.includes('for') || otherLine.includes('while')
+      )
+    );
+
+    const hasSingleLoop = codeLines.some(line => 
+      line.includes('for') || line.includes('while') || line.includes('foreach') || line.includes('map') || line.includes('filter')
+    );
+
+    const hasRecursion = codeLines.some(line => {
+      if (language === 'javascript') return line.includes('function') && code.includes('return') && code.includes('(');
+      if (language === 'python') return line.includes('def') && code.includes('return') && code.includes('(');
+      if (language === 'java') return line.includes('return') && code.includes('(');
+      return false;
+    });
+
+    const hasArrayCreation = codeLines.some(line => 
+      line.includes('new array') || line.includes('[]') || line.includes('list(') || line.includes('vector')
+    );
+
+    const hasHashMap = codeLines.some(line => 
+      line.includes('map') || line.includes('dict') || line.includes('hashmap') || line.includes('object') || line.includes('{}')
+    );
+
+    if (hasNestedLoops) {
+      timeComplexity = "O(n²)";
+      analysis = "Nested loops detected";
+    } else if (hasSingleLoop) {
+      timeComplexity = "O(n)";
+      analysis = "Single loop or iteration detected";
+    } else if (hasRecursion) {
+      timeComplexity = "O(log n) or O(n)";
+      analysis = "Recursive function detected";
+    }
+
+    if (hasArrayCreation || hasHashMap) {
+      spaceComplexity = "O(n)";
+      if (analysis === "Basic operation") {
+        analysis = "Data structure allocation detected";
+      }
+    }
+
+    return {
+      time: timeComplexity,
+      space: spaceComplexity,
+      analysis: analysis
+    };
+  }
 }
 
-// Export a singleton instance
 // Export a singleton instance
 export const storage = new DatabaseStorage();

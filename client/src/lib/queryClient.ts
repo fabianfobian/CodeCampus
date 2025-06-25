@@ -7,20 +7,49 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
-  method: string,
-  url: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const res = await fetch(url, {
+export async function apiRequest(method: string, url: string, data?: any) {
+  const options: RequestInit = {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
-    body: data ? JSON.stringify(data) : undefined,
-    credentials: "include",
-  });
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  };
 
-  await throwIfResNotOk(res);
-  return res;
+  if (data) {
+    options.body = JSON.stringify(data);
+  }
+
+  try {
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage;
+
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorMessage = errorJson.message || errorJson.errors?.[0]?.message || 'An error occurred';
+      } catch {
+        errorMessage = errorText || `HTTP ${response.status}`;
+      }
+
+      throw new Error(errorMessage);
+    }
+
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+
+    return response;
+  } catch (error) {
+    // Handle network errors and other fetch failures
+    if (error instanceof TypeError) {
+      throw new Error('Network error: Please check your connection');
+    }
+    throw error;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";

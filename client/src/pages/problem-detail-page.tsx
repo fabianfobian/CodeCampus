@@ -30,6 +30,7 @@ export default function ProblemDetailPage() {
   const [editedDescription, setEditedDescription] = useState("");
   const [output, setOutput] = useState("");
   const [showOutput, setShowOutput] = useState(false);
+  const [complexity, setComplexity] = useState({ time: "O(1)", space: "O(1)", analysis: "No analysis available" });
   const { user } = useAuth();
 
   // Fetch problem details
@@ -85,14 +86,19 @@ export default function ProblemDetailPage() {
 
       if (response.success) {
         const executionTime = response.executionTime ? ` (${response.executionTime}ms)` : "";
-        setOutput(prev => prev + response.output + `\n\nExecution completed successfully!${executionTime}`);
+        setOutput(response.output + `\n\nExecution completed!${executionTime}`);
+        
+        // Update complexity analysis if available
+        if (response.complexity) {
+          setComplexity(response.complexity);
+        }
       } else {
-        setOutput(prev => prev + `Error: ${response.error || response.output}`);
+        setOutput(`Error: ${response.error || response.output}`);
       }
     } catch (error: any) {
       console.error("Error running code:", error);
       const errorMsg = error.message || "Failed to execute code";
-      setOutput(prev => prev + `\nError: ${errorMsg}`);
+      setOutput(`Error: ${errorMsg}`);
     } finally {
       setIsRunning(false);
     }
@@ -107,7 +113,7 @@ export default function ProblemDetailPage() {
         problemId: Number(id),
         language,
         code,
-        status: "pending"
+        status: "submitted"
       });
 
       queryClient.invalidateQueries({ queryKey: ["/api/submissions"] });
@@ -384,8 +390,8 @@ export default function ProblemDetailPage() {
                 {/* Submit controls */}
                 <div className="p-3 border-t border-slate-200 flex items-center justify-between">
                   <div className="flex items-center text-xs text-slate-500 space-x-3">
-                    <span>Time Complexity: O(n)</span>
-                    <span>Space Complexity: O(n)</span>
+                    <span title={complexity.analysis}>Time Complexity: {complexity.time}</span>
+                    <span title={complexity.analysis}>Space Complexity: {complexity.space}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button 

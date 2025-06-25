@@ -175,12 +175,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     try {
-      const submissionData = insertSubmissionSchema.parse({
+      // Set default status to 'submitted' if not provided or invalid
+      const submissionData = {
         ...req.body,
-        userId: req.user.id
-      });
+        userId: req.user.id,
+        status: req.body.status || 'submitted'
+      };
 
-      const submission = await storage.createSubmission(submissionData);
+      const validatedData = insertSubmissionSchema.parse(submissionData);
+      const submission = await storage.createSubmission(validatedData);
       res.status(201).json(submission);
     } catch (error) {
       if (error instanceof ZodError) {
