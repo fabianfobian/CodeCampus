@@ -91,7 +91,11 @@ export default function AdminProblemsPage() {
   const [activeTab, setActiveTab] = useState<string>("details");
   const [currentLanguage, setCurrentLanguage] = useState<string>("javascript");
   const [languageCodes, setLanguageCodes] = useState<LanguageCode[]>([
-    { languageId: "javascript", code: "// JavaScript starter code" }
+    { languageId: "javascript", code: "function solution() {\n    // Your code here\n}" },
+    { languageId: "python", code: "def solution():\n    # Your code here\n    pass" },
+    { languageId: "java", code: "public class Solution {\n    public void solution() {\n        // Your code here\n    }\n}" },
+    { languageId: "cpp", code: "#include <iostream>\nusing namespace std;\n\nint solution() {\n    // Your code here\n    return 0;\n}" },
+    { languageId: "go", code: "package main\n\nimport \"fmt\"\n\nfunc solution() {\n    // Your code here\n}" }
   ]);
   const [testCases, setTestCases] = useState<TestCase[]>([
     { input: "", output: "" }
@@ -116,7 +120,13 @@ export default function AdminProblemsPage() {
       title: "",
       description: "",
       difficulty: "medium",
-      starterCode: {},
+      starterCode: {
+        javascript: "function solution() {\n    // Your code here\n}",
+        python: "def solution():\n    # Your code here\n    pass",
+        java: "public class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
+        cpp: "#include <iostream>\nusing namespace std;\n\nint solution() {\n    // Your code here\n    return 0;\n}",
+        go: "package main\n\nimport \"fmt\"\n\nfunc solution() {\n    // Your code here\n}"
+      },
       testCases: [{ input: "", output: "" }],
       timeLimit: 1000,
       memoryLimit: 128,
@@ -136,6 +146,16 @@ export default function AdminProblemsPage() {
         description: "The problem has been created successfully",
       });
       form.reset();
+      setTestCases([{ input: "", output: "" }]);
+      setLanguageCodes([
+        { languageId: "javascript", code: "function solution() {\n    // Your code here\n}" },
+        { languageId: "python", code: "def solution():\n    # Your code here\n    pass" },
+        { languageId: "java", code: "public class Solution {\n    public void solution() {\n        // Your code here\n    }\n}" },
+        { languageId: "cpp", code: "#include <iostream>\nusing namespace std;\n\nint solution() {\n    // Your code here\n    return 0;\n}" },
+        { languageId: "go", code: "package main\n\nimport \"fmt\"\n\nfunc solution() {\n    // Your code here\n}" }
+      ]);
+      setCurrentLanguage("javascript");
+      setActiveTab("details");
       setIsCreateDialogOpen(false);
       queryClient.invalidateQueries({ queryKey: ["/api/problems"] });
     },
@@ -222,7 +242,19 @@ export default function AdminProblemsPage() {
   // Get code for current language
   const getCurrentLanguageCode = () => {
     const langCode = languageCodes.find(lc => lc.languageId === currentLanguage);
-    return langCode?.code || "";
+    return langCode?.code || getDefaultStarterCode(currentLanguage);
+  };
+
+  // Get default starter code for different languages
+  const getDefaultStarterCode = (lang: string) => {
+    const templates = {
+      javascript: "function solution() {\n    // Your code here\n}",
+      python: "def solution():\n    # Your code here\n    pass",
+      java: "public class Solution {\n    public void solution() {\n        // Your code here\n    }\n}",
+      cpp: "#include <iostream>\nusing namespace std;\n\nint solution() {\n    // Your code here\n    return 0;\n}",
+      go: "package main\n\nimport \"fmt\"\n\nfunc solution() {\n    // Your code here\n}"
+    };
+    return templates[lang] || "// Your code here";
   };
 
   // Filter problems

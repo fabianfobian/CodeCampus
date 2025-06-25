@@ -77,7 +77,7 @@ export default function ProblemDetailPage() {
     setShowOutput(true);
     try {
       setOutput("Running code...\n");
-      
+
       const response = await apiRequest("POST", "/api/execute", {
         language,
         code
@@ -257,7 +257,7 @@ export default function ProblemDetailPage() {
                         {problem.description ? (
                           <div>
                             <div className="whitespace-pre-wrap">{problem.description}</div>
-                            
+
                             {/* Show examples if available */}
                             {problem.testCases && problem.testCases.length > 0 && (
                               <div className="mt-6">

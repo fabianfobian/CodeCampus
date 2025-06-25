@@ -183,19 +183,20 @@ export class DatabaseStorage implements IStorage {
   // Problem-related operations
   async getProblem(id: number) {
     try {
-      const problem = await db.query.problems.findFirst({
-        where: eq(schema.problems.id, id)
-      });
+      const [problem] = await db
+        .select()
+        .from(schema.problems)
+        .where(eq(schema.problems.id, id))
+        .limit(1);
 
       if (!problem) return null;
 
-      // Fetch tags separately to avoid relation issues
-      const problemTags = await db.query.problemTags.findMany({
-        where: eq(schema.problemTags.problemId, id),
-        with: {
-          tag: true
-        }
-      });
+      // Get tags separately
+      const problemTags = await db
+        .select({ tag: schema.problemTags })
+        .from(schema.problemToTag)
+        .innerJoin(schema.problemTags, eq(schema.problemToTag.tagId, schema.problemTags.id))
+        .where(eq(schema.problemToTag.problemId, id));
 
       return {
         ...problem,
@@ -216,23 +217,24 @@ export class DatabaseStorage implements IStorage {
       }
 
       if (filters.search) {
-        query = query.where(or(
-          like(schema.problems.title, `%${filters.search}%`),
-          like(schema.problems.description, `%${filters.search}%`)
-        ));
+        query = query.where(
+          or(
+            like(schema.problems.title, `%${filters.search}%`),
+            like(schema.problems.description, `%${filters.search}%`)
+          )
+        );
       }
 
-      const problems = await query.orderBy(asc(schema.problems.id));
+      const problemsList = await query.orderBy(asc(schema.problems.id));
 
-      // For each problem, fetch its tags
+      // Get tags for each problem
       const problemsWithTags = await Promise.all(
-        problems.map(async (problem) => {
-          const problemTags = await db.query.problemToTag.findMany({
-            where: eq(schema.problemToTag.problemId, problem.id),
-            with: {
-              tag: true
-            }
-          });
+        problemsList.map(async (problem) => {
+          const problemTags = await db
+            .select({ tag: schema.problemTags })
+            .from(schema.problemToTag)
+            .innerJoin(schema.problemTags, eq(schema.problemToTag.tagId, schema.problemTags.id))
+            .where(eq(schema.problemToTag.problemId, problem.id));
 
           return {
             ...problem,
