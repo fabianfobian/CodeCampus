@@ -368,17 +368,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Execute code
   app.post("/api/execute", requireAuth, async (req, res) => {
     try {
-      const { language, code } = req.body;
+      const { language, code, testCases } = req.body;
 
       if (!language || !code) {
         return res.status(400).json({ 
           message: "Language and code are required",
           output: "Error: Missing language or code parameter",
-          success: false
+          success: false,
+          status: 'compilation_error'
         });
       }
 
-      const result = await storage.executeCode(language, code);
+      const result = await storage.executeCode(language, code, testCases);
       res.json(result);
     } catch (error: any) {
       console.error("Error executing code:", error);
@@ -386,7 +387,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: "Failed to execute code",
         output: `Error: ${error.message || "Code execution failed"}`,
         success: false,
-        error: error.message || "Internal server error"
+        error: error.message || "Internal server error",
+        status: 'runtime_error',
+        timeComplexity: "Unknown",
+        spaceComplexity: "Unknown"
       });
     }
   });
