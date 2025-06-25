@@ -6,11 +6,11 @@ import { ZodError } from "zod";
 import { insertProblemSchema, insertSubmissionSchema, insertCompetitionSchema, insertProblemTagSchema } from "@shared/schema";
 import dotenv from 'dotenv';
 dotenv.config();
-import { insertUserSchema, users, problems, problemTags, submissions, competitions, type SelectUser } from "@shared/schema";
+import { insertUserSchema, users, problems, problemTags, submissions, competitions, type User } from "@shared/schema";
 import { desc, eq, and, sql, count, avg } from "drizzle-orm";
-import { requireAuth } from "./auth";
-import { getDbConnection } from "@db";
-import { hash } from "bcryptjs";
+import { requireAuth, hashPassword } from "./auth";
+import { db } from "../db/index.js";
+
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -40,7 +40,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Hash password if provided
         if (userData.password) {
-          userData.password = await hash(userData.password, 10);
+          userData.password = await hashPassword(userData.password);
         } else {
           delete userData.password; // Remove password field if empty
         }
