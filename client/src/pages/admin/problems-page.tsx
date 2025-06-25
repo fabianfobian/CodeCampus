@@ -88,6 +88,8 @@ export default function AdminProblemsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProblem, setEditingProblem] = useState<Problem | null>(null);
   const [activeTab, setActiveTab] = useState<string>("details");
   const [currentLanguage, setCurrentLanguage] = useState<string>("javascript");
   const [languageCodes, setLanguageCodes] = useState<LanguageCode[]>([
@@ -168,6 +170,30 @@ export default function AdminProblemsPage() {
     },
   });
 
+  // Edit problem mutation
+  const editProblemMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: CreateProblemFormValues }) => {
+      const response = await apiRequest("PUT", `/api/problems/${id}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Problem updated",
+        description: "The problem has been updated successfully",
+      });
+      setIsEditDialogOpen(false);
+      setEditingProblem(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/problems"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update problem",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete problem mutation
   const deleteProblemMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -197,12 +223,50 @@ export default function AdminProblemsPage() {
       starterCode[lc.languageId] = lc.code;
     });
     
-    // Submit with complete data
-    createProblemMutation.mutate({
+    const data = {
       ...values,
       starterCode,
       testCases
+    };
+    
+    if (editingProblem) {
+      editProblemMutation.mutate({ id: editingProblem.id, data });
+    } else {
+      createProblemMutation.mutate(data);
+    }
+  };
+
+  // Handle edit problem
+  const handleEditProblem = (problem: Problem) => {
+    setEditingProblem(problem);
+    
+    // Populate form with existing data
+    form.reset({
+      title: problem.title,
+      description: problem.description,
+      difficulty: problem.difficulty,
+      timeLimit: problem.timeLimit,
+      memoryLimit: problem.memoryLimit,
+      tags: [], // You might want to fetch associated tags
+      starterCode: problem.starterCode as Record<string, string>,
+      testCases: problem.testCases as any[]
     });
+
+    // Set language codes and test cases
+    if (problem.starterCode) {
+      const codes = problem.starterCode as Record<string, string>;
+      const newLanguageCodes = Object.entries(codes).map(([languageId, code]) => ({
+        languageId,
+        code
+      }));
+      setLanguageCodes(newLanguageCodes);
+    }
+
+    if (problem.testCases) {
+      setTestCases(problem.testCases as TestCase[]);
+    }
+
+    setIsEditDialogOpen(true);
   };
 
   // Add a test case
@@ -585,6 +649,280 @@ export default function AdminProblemsPage() {
                     </Tabs>
                   </DialogContent>
                 </Dialog>
+
+                {/* Edit Problem Dialog */}
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                  <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Edit Problem</DialogTitle>
+                      <DialogDescription>
+                        Update the problem details, test cases, and starter code.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
+                      <TabsList className="grid grid-cols-3">
+                        <TabsTrigger value="details">Problem Details</TabsTrigger>
+                        <TabsTrigger value="starter-code">Starter Code</TabsTrigger>
+                        <TabsTrigger value="test-cases">Test Cases</TabsTrigger>
+                      </TabsList>
+                      
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)}>
+                          <TabsContent value="details" className="space-y-4 py-4">
+                            <FormField
+                              control={form.control}
+                              name="title"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Problem Title</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <FormField
+                              control={form.control}
+                              name="description"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Description</FormLabel>
+                                  <FormControl>
+                                    <Textarea 
+                                      {...field} 
+                                      className="min-h-[200px]"
+                                      placeholder="Write your problem description here. You can use HTML for formatting."
+                                    />
+                                  </FormControl>
+                                  <FormDescription>
+                                    Provide a clear explanation of the problem, constraints, and examples.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <FormField
+                                control={form.control}
+                                name="difficulty"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Difficulty</FormLabel>
+                                    <Select 
+                                      onValueChange={field.onChange} 
+                                      value={field.value}
+                                    >
+                                      <FormControl>
+                                        <SelectTrigger>
+                                          <SelectValue placeholder="Select difficulty" />
+                                        </SelectTrigger>
+                                      </FormControl>
+                                      <SelectContent>
+                                        <SelectItem value="easy">Easy</SelectItem>
+                                        <SelectItem value="medium">Medium</SelectItem>
+                                        <SelectItem value="hard">Hard</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              <FormField
+                                control={form.control}
+                                name="timeLimit"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Time Limit (ms)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        {...field}
+                                        onChange={e => field.onChange(parseInt(e.target.value))}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                              
+                              <FormField
+                                control={form.control}
+                                name="memoryLimit"
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Memory Limit (MB)</FormLabel>
+                                    <FormControl>
+                                      <Input 
+                                        type="number" 
+                                        {...field}
+                                        onChange={e => field.onChange(parseInt(e.target.value))}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                            
+                            <FormField
+                              control={form.control}
+                              name="tags"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Tags</FormLabel>
+                                  <div className="flex flex-wrap gap-2 p-3 border rounded-md">
+                                    {tags && tags.map(tag => (
+                                      <Badge 
+                                        key={tag.id}
+                                        variant={field.value?.includes(tag.id) ? "default" : "outline"}
+                                        className="cursor-pointer"
+                                        onClick={() => {
+                                          const currentTags = field.value || [];
+                                          if (currentTags.includes(tag.id)) {
+                                            field.onChange(currentTags.filter(id => id !== tag.id));
+                                          } else {
+                                            field.onChange([...currentTags, tag.id]);
+                                          }
+                                        }}
+                                      >
+                                        {tag.name}
+                                      </Badge>
+                                    ))}
+                                    {!tags || tags.length === 0 && (
+                                      <span className="text-sm text-slate-500">No tags available</span>
+                                    )}
+                                  </div>
+                                  <FormDescription>
+                                    Select relevant tags to categorize the problem.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </TabsContent>
+                          
+                          <TabsContent value="starter-code" className="py-4">
+                            <div className="mb-4">
+                              <FormLabel>Language</FormLabel>
+                              <Select 
+                                value={currentLanguage} 
+                                onValueChange={setCurrentLanguage}
+                              >
+                                <SelectTrigger className="w-40">
+                                  <SelectValue placeholder="Select language" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {SUPPORTED_LANGUAGES.map(lang => (
+                                    <SelectItem key={lang.id} value={lang.id}>
+                                      {lang.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-sm text-slate-500 mt-1">
+                                Provide starter code templates for each supported language.
+                              </p>
+                            </div>
+                            
+                            <div className="h-96 border rounded-md overflow-hidden">
+                              <CodeEditor
+                                language={currentLanguage}
+                                value={getCurrentLanguageCode()}
+                                onChange={updateLanguageCode}
+                              />
+                            </div>
+                          </TabsContent>
+                          
+                          <TabsContent value="test-cases" className="py-4">
+                            <div className="flex justify-between items-center mb-4">
+                              <h3 className="text-lg font-medium">Test Cases</h3>
+                              <Button 
+                                type="button"
+                                variant="outline" 
+                                onClick={addTestCase}
+                              >
+                                Add Test Case
+                              </Button>
+                            </div>
+                            
+                            <div className="space-y-6">
+                              {testCases.map((testCase, index) => (
+                                <div key={index} className="p-4 border rounded-md">
+                                  <div className="flex justify-between items-center mb-3">
+                                    <h4 className="font-medium">Test Case #{index + 1}</h4>
+                                    {testCases.length > 1 && (
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => removeTestCase(index)}
+                                        className="text-red-500 hover:text-red-700"
+                                      >
+                                        Remove
+                                      </Button>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                      <FormLabel>Input</FormLabel>
+                                      <Textarea
+                                        value={testCase.input}
+                                        onChange={(e) => updateTestCase(index, 'input', e.target.value)}
+                                        placeholder="Input data for test case"
+                                        className="font-mono"
+                                      />
+                                    </div>
+                                    
+                                    <div>
+                                      <FormLabel>Expected Output</FormLabel>
+                                      <Textarea
+                                        value={testCase.output}
+                                        onChange={(e) => updateTestCase(index, 'output', e.target.value)}
+                                        placeholder="Expected output for test case"
+                                        className="font-mono"
+                                      />
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="mt-3">
+                                    <FormLabel>Explanation (Optional)</FormLabel>
+                                    <Textarea
+                                      value={testCase.explanation || ''}
+                                      onChange={(e) => updateTestCase(index, 'explanation', e.target.value)}
+                                      placeholder="Explain why this is the expected output"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </TabsContent>
+                          
+                          <DialogFooter className="mt-6">
+                            <Button 
+                              type="button" 
+                              variant="outline" 
+                              onClick={() => setIsEditDialogOpen(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              type="submit"
+                              disabled={editProblemMutation.isPending}
+                            >
+                              {editProblemMutation.isPending ? "Updating..." : "Update Problem"}
+                            </Button>
+                          </DialogFooter>
+                        </form>
+                      </Form>
+                    </Tabs>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
             
@@ -643,7 +981,12 @@ export default function AdminProblemsPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm" className="flex items-center">
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="flex items-center"
+                                onClick={() => handleEditProblem(problem)}
+                              >
                                 <Edit className="h-3.5 w-3.5 mr-1" />
                                 Edit
                               </Button>

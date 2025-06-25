@@ -32,6 +32,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.put("/api/users/:id", (req: any, res: Response) => {
+    const { id } = req.params;
+    req.authorize(['super_admin', 'admin'])(req, res, async () => {
+      try {
+        const userData = req.body;
+        
+        // Hash password if provided
+        if (userData.password) {
+          userData.password = await hash(userData.password, 10);
+        } else {
+          delete userData.password; // Remove password field if empty
+        }
+
+        const updatedUser = await storage.updateUser(Number(id), userData);
+
+        if (!updatedUser) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        // Remove password from response
+        const { password, ...userWithoutPassword } = updatedUser;
+        res.json(userWithoutPassword);
+      } catch (error) {
+        console.error(`Error updating user ${id}:`, error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+  });
+
+  app.delete("/api/users/:id", (req: any, res: Response) => {
+    const { id } = req.params;
+    req.authorize(['super_admin', 'admin'])(req, res, async () => {
+      try {
+        const success = await storage.deleteUser(Number(id));
+
+        if (!success) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        res.status(204).send();
+      } catch (error) {
+        console.error(`Error deleting user ${id}:`, error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+  });
+
   app.get("/api/users/role/:role", (req: any, res: Response) => {
     const { role } = req.params;
     req.authorize(['super_admin', 'admin'])(req, res, async () => {

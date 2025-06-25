@@ -54,13 +54,24 @@ const createUserSchema = z.object({
   role: z.enum(["learner", "examiner", "admin", "super_admin"]),
 });
 
+const editUserSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters").optional(),
+  displayName: z.string().optional(),
+  role: z.enum(["learner", "examiner", "admin", "super_admin"]),
+});
+
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
+type EditUserFormValues = z.infer<typeof editUserSchema>;
 
 export default function UsersPage() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
   
   // Fetch users
   const { data: users, isLoading, refetch } = useQuery<User[]>({
@@ -71,6 +82,18 @@ export default function UsersPage() {
   // Create user form
   const form = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      displayName: "",
+      role: "learner",
+    },
+  });
+
+  // Edit user form
+  const editForm = useForm<EditUserFormValues>({
+    resolver: zodResolver(editUserSchema),
     defaultValues: {
       username: "",
       email: "",
@@ -104,9 +127,75 @@ export default function UsersPage() {
     },
   });
 
+  // Edit user mutation
+  const editUserMutation = useMutation({
+    mutationFn: async ({ id, userData }: { id: number; userData: EditUserFormValues }) => {
+      const response = await apiRequest("PUT", `/api/users/${id}`, userData);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "User updated",
+        description: "The user has been updated successfully",
+      });
+      editForm.reset();
+      setIsEditDialogOpen(false);
+      setEditingUser(null);
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to update user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/users/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "User deleted",
+        description: "The user has been deleted successfully",
+      });
+      refetch();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete user",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   // Handle form submission
   const onSubmit = (values: CreateUserFormValues) => {
     createUserMutation.mutate(values);
+  };
+
+  // Handle edit form submission
+  const onEditSubmit = (values: EditUserFormValues) => {
+    if (editingUser) {
+      editUserMutation.mutate({ id: editingUser.id, userData: values });
+    }
+  };
+
+  // Handle edit user
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    editForm.reset({
+      username: user.username,
+      email: user.email,
+      displayName: user.displayName || "",
+      role: user.role,
+      password: "", // Leave password empty for editing
+    });
+    setIsEditDialogOpen(true);
   };
 
   // Filter users
@@ -287,6 +376,124 @@ export default function UsersPage() {
                     </Form>
                   </DialogContent>
                 </Dialog>
+
+                {/* Edit User Dialog */}
+                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Edit User</DialogTitle>
+                      <DialogDescription>
+                        Update user information. Leave password empty to keep current password.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <Form {...editForm}>
+                      <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4">
+                        <FormField
+                          control={editForm.control}
+                          name="username"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Username</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={editForm.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Email</FormLabel>
+                              <FormControl>
+                                <Input type="email" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={editForm.control}
+                          name="password"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>New Password (Optional)</FormLabel>
+                              <FormControl>
+                                <Input type="password" {...field} placeholder="Leave empty to keep current password" />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={editForm.control}
+                          name="displayName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Display Name (Optional)</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <FormField
+                          control={editForm.control}
+                          name="role"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Role</FormLabel>
+                              <Select 
+                                onValueChange={field.onChange} 
+                                value={field.value}
+                              >
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a role" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="learner">Learner</SelectItem>
+                                  <SelectItem value="examiner">Examiner</SelectItem>
+                                  <SelectItem value="admin">Admin</SelectItem>
+                                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                This determines the user's permissions in the system.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <DialogFooter>
+                          <Button 
+                            type="button" 
+                            variant="outline" 
+                            onClick={() => setIsEditDialogOpen(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            type="submit"
+                            disabled={editUserMutation.isPending}
+                          >
+                            {editUserMutation.isPending ? "Updating..." : "Update User"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
+                    </Form>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
             
@@ -348,8 +555,23 @@ export default function UsersPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex space-x-2">
-                              <Button variant="outline" size="sm">Edit</Button>
-                              <Button variant="outline" size="sm" className="text-red-500 hover:text-red-700">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => handleEditUser(user)}
+                              >
+                                Edit
+                              </Button>
+                              <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="text-red-500 hover:text-red-700"
+                                onClick={() => {
+                                  if (window.confirm("Are you sure you want to delete this user?")) {
+                                    deleteUserMutation.mutate(user.id);
+                                  }
+                                }}
+                              >
                                 Delete
                               </Button>
                             </div>

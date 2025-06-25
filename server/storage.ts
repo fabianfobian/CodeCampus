@@ -169,14 +169,44 @@ export class DatabaseStorage implements IStorage {
 
   async getUsersByRole(role: string) {
     try {
-      const users = await db.query.users.findMany({
-        where: eq(schema.users.role, role),
-        orderBy: asc(schema.users.username)
+      const roleUsers = await db.query.users.findMany({
+        where: eq(schema.users.role, role as any),
+        columns: {
+          password: false, // Exclude password from results
+        },
       });
-      return users;
+      return roleUsers;
     } catch (error) {
       console.error("Error in getUsersByRole:", error);
       return [];
+    }
+  }
+
+  async updateUser(id: number, userData: Partial<typeof schema.users.$inferInsert>) {
+    try {
+      const [updatedUser] = await db.update(schema.users)
+        .set({
+          ...userData,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.users.id, id))
+        .returning();
+      return updatedUser;
+    } catch (error) {
+      console.error("Error in updateUser:", error);
+      throw error;
+    }
+  }
+
+  async deleteUser(id: number) {
+    try {
+      const [deletedUser] = await db.delete(schema.users)
+        .where(eq(schema.users.id, id))
+        .returning();
+      return !!deletedUser;
+    } catch (error) {
+      console.error("Error in deleteUser:", error);
+      throw error;
     }
   }
 
@@ -967,7 +997,7 @@ public class Solution {
       } else if (hasError) {
         outputMessage = stderr.trim();
       } else {
-        outputMessage = `Code executed successfully!\n\nNo console output was generated. This could mean:\n- Your code doesn't contain print/console.log statements\n- Your code is a function that returns a value (try adding print statements)\n- Your code executed but didn't produce visible output\n\nTip: Add console.log() or print() statements to see your results.`;
+        outputMessage = `Code executed successfully!\n\nNo console output was generated. This could mean:\n- Your code doesn't contain print/console.log statements\n- Your code is a function thatreturns a value (try adding print statements)\n- Your code executed but didn't produce visible output\n\nTip: Add console.log() or print() statements to see your results.`;
       }
 
       return {

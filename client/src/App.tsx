@@ -11,8 +11,9 @@ import ProblemsPage from "@/pages/problems-page";
 import ProblemDetailPage from "@/pages/problem-detail-page";
 import CompetitionsPage from "@/pages/competitions-page";
 import SubmissionsPage from "@/pages/submissions-page";
-import UsersPage from "@/pages/admin/users-page";
 import AdminProblemsPage from "@/pages/admin/problems-page";
+import AdminCompetitionsPage from "@/pages/admin/competitions-page";
+import UsersPage from "@/pages/admin/users-page";
 import ReportsPage from "@/pages/admin/reports-page";
 import ProfilePage from "@/pages/profile-page";
 import LearningPathsPage from "@/pages/learning-paths-page";
@@ -38,6 +39,11 @@ function Router() {
       <ProtectedRoute 
         path="/admin/problems" 
         component={AdminProblemsPage}
+        allowedRoles={['super_admin', 'admin', 'examiner']}
+      />
+      <ProtectedRoute 
+        path="/admin/competitions" 
+        component={AdminCompetitionsPage}
         allowedRoles={['super_admin', 'admin', 'examiner']}
       />
       <ProtectedRoute 

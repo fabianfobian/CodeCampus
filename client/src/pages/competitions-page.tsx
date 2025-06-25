@@ -14,6 +14,7 @@ import {
   CheckIcon,
   ArrowRightIcon,
   Loader2,
+  Plus,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -199,6 +200,14 @@ export default function CompetitionsPage() {
                 <h1 className="text-2xl font-bold text-slate-800">Coding Competitions</h1>
                 <p className="text-slate-500">Participate in challenges and compete with other programmers</p>
               </div>
+              {(user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'examiner') && (
+                <Link href="/admin/competitions">
+                  <Button className="flex items-center gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Competition
+                  </Button>
+                </Link>
+              )}
             </div>
             
             <Tabs 
