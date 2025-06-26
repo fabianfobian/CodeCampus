@@ -325,6 +325,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  app.put("/api/competitions/:id", (req: any, res: Response) => {
+    const { id } = req.params;
+    req.authorize(['super_admin', 'admin', 'examiner'])(req, res, async () => {
+      try {
+        const competitionData = req.body;
+        const updatedCompetition = await storage.updateCompetition(Number(id), competitionData);
+
+        if (!updatedCompetition) {
+          return res.status(404).json({ message: "Competition not found" });
+        }
+
+        res.json(updatedCompetition);
+      } catch (error) {
+        console.error(`Error updating competition ${id}:`, error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+  });
+
+  app.delete("/api/competitions/:id", (req: any, res: Response) => {
+    const { id } = req.params;
+    req.authorize(['super_admin', 'admin'])(req, res, async () => {
+      try {
+        const success = await storage.deleteCompetition(Number(id));
+
+        if (!success) {
+          return res.status(404).json({ message: "Competition not found" });
+        }
+
+        res.status(204).send();
+      } catch (error) {
+        console.error(`Error deleting competition ${id}:`, error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
+  });
+
   app.post("/api/competitions/:id/problems", (req: any, res: Response) => {
     const { id } = req.params;
     req.authorize(['super_admin', 'admin', 'examiner'])(req, res, async () => {
@@ -374,6 +411,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error(`Error fetching leaderboard for competition ${req.params.id}:`, error);
       res.status(500).json({ message: "Internal server error" });
     }
+  });
+
+  // Learning Paths Routes
+  app.get("/api/learning-paths", async (req: Request, res: Response) => {
+    try {
+      const learningPaths = await storage.getLearningPaths();
+      res.json(learningPaths);
+    } catch (error) {
+      console.error("Error fetching learning paths:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.get("/api/users/:id/learning-progress", async (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const progress = await storage.getUserLearningProgress(Number(id));
+      res.json(progress);
+    } catch (error) {
+      console.error(`Error fetching learning progress for user ${req.params.id}:`, error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  app.post("/api/learning-paths", (req: any, res: Response) => {
+    req.authorize(['super_admin', 'admin', 'examiner'])(req, res, async () => {
+      try {
+        const pathData = req.body;
+        const learningPath = await storage.createLearningPath(pathData);
+        res.status(201).json(learningPath);
+      } catch (error) {
+        console.error("Error creating learning path:", error);
+        res.status(500).json({ message: "Internal server error" });
+      }
+    });
   });
 
   // User Stats Routes

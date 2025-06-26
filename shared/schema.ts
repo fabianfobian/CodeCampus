@@ -209,6 +209,75 @@ export const userSkillsRelations = relations(userSkills, ({ one }) => ({
   }),
 }));
 
+// Learning Paths
+export const learningPaths = pgTable("learning_paths", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull(),
+  difficulty: difficultyEnum("difficulty").notNull(),
+  totalLessons: integer("total_lessons").notNull().default(0),
+  estimatedHours: integer("estimated_hours").notNull().default(0),
+  topics: jsonb("topics").notNull(), // Array of topic strings
+  prerequisites: jsonb("prerequisites").notNull().default('[]'), // Array of prerequisite path IDs
+  color: text("color").notNull().default('bg-blue-500'),
+  createdBy: integer("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const learningPathsRelations = relations(learningPaths, ({ many }) => ({
+  userProgress: many(userLearningProgress),
+  lessons: many(learningPathLessons),
+}));
+
+// Learning Path Lessons
+export const learningPathLessons = pgTable("learning_path_lessons", {
+  id: serial("id").primaryKey(),
+  pathId: integer("path_id").notNull().references(() => learningPaths.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  content: text("content").notNull(),
+  orderIndex: integer("order_index").notNull(),
+  problemIds: jsonb("problem_ids").default('[]'), // Array of related problem IDs
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const learningPathLessonsRelations = relations(learningPathLessons, ({ one }) => ({
+  path: one(learningPaths, {
+    fields: [learningPathLessons.pathId],
+    references: [learningPaths.id],
+  }),
+}));
+
+// User Learning Progress
+export const userLearningProgress = pgTable("user_learning_progress", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull().references(() => users.id),
+  pathId: integer("path_id").notNull().references(() => learningPaths.id),
+  completedLessons: integer("completed_lessons").default(0),
+  currentLessonId: integer("current_lesson_id").references(() => learningPathLessons.id),
+  timeSpent: integer("time_spent").default(0), // in hours
+  canAccess: boolean("can_access").default(true),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const userLearningProgressRelations = relations(userLearningProgress, ({ one }) => ({
+  user: one(users, {
+    fields: [userLearningProgress.userId],
+    references: [users.id],
+  }),
+  path: one(learningPaths, {
+    fields: [userLearningProgress.pathId],
+    references: [learningPaths.id],
+  }),
+  currentLesson: one(learningPathLessons, {
+    fields: [userLearningProgress.currentLessonId],
+    references: [learningPathLessons.id],
+  }),
+}));
+
 // Validation schemas
 export const insertUserSchema = createInsertSchema(users, {
   username: (schema) => schema.min(3, "Username must be at least 3 characters"),
@@ -221,6 +290,9 @@ export const insertProblemSchema = createInsertSchema(problems);
 export const insertSubmissionSchema = createInsertSchema(submissions);
 export const insertCompetitionSchema = createInsertSchema(competitions);
 export const insertProblemTagSchema = createInsertSchema(problemTags);
+export const insertLearningPathSchema = createInsertSchema(learningPaths);
+export const insertLearningPathLessonSchema = createInsertSchema(learningPathLessons);
+export const insertUserLearningProgressSchema = createInsertSchema(userLearningProgress);
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -231,3 +303,6 @@ export type Competition = typeof competitions.$inferSelect;
 export type ProblemTag = typeof problemTags.$inferSelect;
 export type UserStats = typeof userStats.$inferSelect;
 export type UserSkill = typeof userSkills.$inferSelect;
+export type LearningPath = typeof learningPaths.$inferSelect;
+export type LearningPathLesson = typeof learningPathLessons.$inferSelect;
+export type UserLearningProgress = typeof userLearningProgress.$inferSelect;

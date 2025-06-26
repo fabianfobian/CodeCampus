@@ -18,52 +18,7 @@ import {
   PersonIcon
 } from "@radix-ui/react-icons";
 
-const LEARNING_PATHS = [
-  {
-    id: 1,
-    title: "Data Structures Fundamentals",
-    description: "Master the essential data structures used in programming",
-    difficulty: "Beginner",
-    totalLessons: 15,
-    estimatedHours: 25,
-    topics: ["Arrays", "Linked Lists", "Stacks", "Queues", "Hash Tables"],
-    prerequisites: [],
-    color: "bg-blue-500"
-  },
-  {
-    id: 2,
-    title: "Algorithm Design Patterns",
-    description: "Learn common algorithmic approaches and problem-solving techniques",
-    difficulty: "Intermediate",
-    totalLessons: 20,
-    estimatedHours: 35,
-    topics: ["Two Pointers", "Sliding Window", "Recursion", "Dynamic Programming"],
-    prerequisites: ["Data Structures Fundamentals"],
-    color: "bg-green-500"
-  },
-  {
-    id: 3,
-    title: "Advanced Graph Algorithms",
-    description: "Deep dive into graph theory and advanced graph algorithms",
-    difficulty: "Advanced",
-    totalLessons: 18,
-    estimatedHours: 40,
-    topics: ["DFS/BFS", "Shortest Path", "Minimum Spanning Tree", "Network Flow"],
-    prerequisites: ["Algorithm Design Patterns"],
-    color: "bg-purple-500"
-  },
-  {
-    id: 4,
-    title: "System Design Fundamentals",
-    description: "Learn how to design scalable systems and architectures",
-    difficulty: "Advanced",
-    totalLessons: 12,
-    estimatedHours: 30,
-    topics: ["Scalability", "Load Balancing", "Caching", "Database Design"],
-    prerequisites: ["Advanced Graph Algorithms"],
-    color: "bg-orange-500"
-  }
-];
+
 
 function LearningPathCard({ path, userProgress }: { path: any; userProgress: any }) {
   const progress = userProgress?.completedLessons || 0;
@@ -169,6 +124,12 @@ function LearningPathCard({ path, userProgress }: { path: any; userProgress: any
 export default function LearningPathsPage() {
   const { user } = useAuth();
 
+  // Fetch learning paths
+  const { data: learningPaths } = useQuery({
+    queryKey: ["/api/learning-paths"],
+    queryFn: () => apiRequest("/api/learning-paths"),
+  });
+
   // Fetch user's learning progress
   const { data: userProgress } = useQuery({
     queryKey: [`/api/users/${user?.id}/learning-progress`],
@@ -193,7 +154,7 @@ export default function LearningPathsPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {LEARNING_PATHS.map((path) => (
+              {learningPaths?.map((path: any) => (
                 <LearningPathCard 
                   key={path.id} 
                   path={path} 

@@ -74,6 +74,11 @@ export interface IStorage {
 
   // Code execution
   executeCode: (language: string, code: string) => Promise<{ output: string; error?: string; success: boolean; executionTime?: number }>;
+
+  // Learning paths
+  getLearningPaths: () => Promise<any[]>;
+  createLearningPath: (pathData: any) => Promise<any>;
+  getUserLearningProgress: (userId: number) => Promise<any>;
 }
 
 const execAsync = promisify(exec);
@@ -490,6 +495,42 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error in createCompetition:", error);
       throw error;
+    }
+  }
+
+  async updateCompetition(id: number, data: any) {
+    try {
+      const [updatedCompetition] = await db.update(schema.competitions)
+        .set({
+          ...data,
+          updatedAt: new Date()
+        })
+        .where(eq(schema.competitions.id, id))
+        .returning();
+      return updatedCompetition || null;
+    } catch (error) {
+      console.error("Error in updateCompetition:", error);
+      return null;
+    }
+  }
+
+  async deleteCompetition(id: number) {
+    try {
+      // Delete related data first
+      await db.delete(schema.competitionProblems)
+        .where(eq(schema.competitionProblems.competitionId, id));
+      
+      await db.delete(schema.userCompetitions)
+        .where(eq(schema.userCompetitions.competitionId, id));
+
+      // Delete the competition
+      const result = await db.delete(schema.competitions)
+        .where(eq(schema.competitions.id, id));
+
+      return result.count > 0;
+    } catch (error) {
+      console.error("Error in deleteCompetition:", error);
+      return false;
     }
   }
 
@@ -1093,6 +1134,62 @@ public class Solution {
       space: spaceComplexity,
       analysis: analysis
     };
+  }
+
+  // Learning Paths methods
+  async getLearningPaths() {
+    try {
+      const paths = await db.query.learningPaths.findMany({
+        orderBy: asc(schema.learningPaths.id),
+        with: {
+          lessons: {
+            orderBy: asc(schema.learningPathLessons.orderIndex)
+          }
+        }
+      });
+      return paths;
+    } catch (error) {
+      console.error("Error in getLearningPaths:", error);
+      return [];
+    }
+  }
+
+  async createLearningPath(pathData: any) {
+    try {
+      const [learningPath] = await db.insert(schema.learningPaths)
+        .values({
+          ...pathData,
+          createdAt: new Date()
+        })
+        .returning();
+      return learningPath;
+    } catch (error) {
+      console.error("Error in createLearningPath:", error);
+      throw error;
+    }
+  }
+
+  async getUserLearningProgress(userId: number) {
+    try {
+      const progress = await db.query.userLearningProgress.findMany({
+        where: eq(schema.userLearningProgress.userId, userId),
+        with: {
+          path: true,
+          currentLesson: true
+        }
+      });
+
+      // Convert to object with pathId as key for easier lookup
+      const progressMap: any = {};
+      progress.forEach(p => {
+        progressMap[p.pathId] = p;
+      });
+
+      return progressMap;
+    } catch (error) {
+      console.error("Error in getUserLearningProgress:", error);
+      return {};
+    }
   }
 }
 
