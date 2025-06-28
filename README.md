@@ -41,28 +41,21 @@ npm run dev
 - `/db` - Database setup and migrations
 
 #### Screenshots
-
 ## dashboard
 ![image](https://github.com/user-attachments/assets/6d988e90-87a9-418b-8816-aca7adab3b8e)
-
 ## problems page
 ![image](https://github.com/user-attachments/assets/dc18896c-e443-480a-b001-a43d68e56c09)
-
 ## problem detail and ide to solve the problem
+![image](https://github.com/user-attachments/assets/9a8bc859-6798-41f7-9b2c-f69ed173297c)
 ![image](https://github.com/user-attachments/assets/4ff8f04c-3b93-45be-947c-04f3b423d967)
-
 ## admin user management panel.
 ![image](https://github.com/user-attachments/assets/41b2d027-a8db-4022-bca4-1f73f95bb44a)
-
 ## learning paths page
 ![image](https://github.com/user-attachments/assets/2b6da51e-43db-4fac-af77-468dfbf92bab)
-
 ## discussion page
 ![image](https://github.com/user-attachments/assets/f13bd9e2-2e06-469d-a75d-4b371011c639)
-
 ## sign in page
 ![image](https://github.com/user-attachments/assets/b1f65d68-682e-4e0d-ba42-f4ed67b63b33)
-
 ## problem management
 ![image](https://github.com/user-attachments/assets/7115038b-18bb-4cbf-adfe-5023631d37ab)
 ## creating a new problem/question
