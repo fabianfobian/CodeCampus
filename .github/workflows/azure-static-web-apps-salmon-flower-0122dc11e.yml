@@ -11,6 +11,7 @@ on:
 
 jobs:
   build_and_deploy_job:
+    # Run on pushes to main and open PRs (not closed)
     if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action != 'closed')
     runs-on: ubuntu-latest
     name: Build and Deploy Job
@@ -20,28 +21,39 @@ jobs:
 
     steps:
       - uses: actions/checkout@v3
+        with:
+          submodules: true
+          lfs: false
 
-      - name: Setup Node.js
+      - name: Use Node.js 18.x
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
-      - name: Install Dependencies
-        run: npm install
-        working-directory: client
+      - name: Install dependencies
+        run: npm ci
 
       - name: Build Vite App
         run: npm run build
-        working-directory: client
+
+      - name: Get Id Token
+        id: idtoken
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const core = require('@actions/core')
+            return await core.getIDToken()
+          result-encoding: string
 
       - name: Deploy to Azure Static Web Apps
+        id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_SALMON_FLOWER_0122DC11E }}
           action: "upload"
-          app_location: "client"            # Path to your Vite app
-          output_location: "client/dist"    # Vite's default build output
-          api_location: ""                  # If you're not using Azure Functions
+          app_location: "/"            # App source code path
+          api_location: ""             # Set if you have Azure Functions
+          output_location: "dist"      # Vite output directory
           github_id_token: ${{ steps.idtoken.outputs.result }}
 
   close_pull_request_job:
@@ -50,6 +62,7 @@ jobs:
     name: Close Pull Request Job
     steps:
       - name: Close Pull Request
+        id: closepullrequest
         uses: Azure/static-web-apps-deploy@v1
         with:
           action: "close"
