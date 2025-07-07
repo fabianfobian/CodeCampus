@@ -36,7 +36,7 @@ import { useAuth } from "@/hooks/use-auth";
 export default function CompetitionsPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("upcoming");
-  
+
   // Fetch competitions
   const { data: competitions, isLoading: isLoadingCompetitions } = useQuery<Competition[]>({
     queryKey: ["/api/competitions"],
@@ -47,12 +47,12 @@ export default function CompetitionsPage() {
   const upcomingCompetitions = competitions?.filter(comp => 
     isFuture(new Date(comp.startTime))
   ) || [];
-  
+
   const activeCompetitions = competitions?.filter(comp => 
     isPast(new Date(comp.startTime)) && 
     isFuture(new Date(comp.endTime))
   ) || [];
-  
+
   const pastCompetitions = competitions?.filter(comp => 
     isPast(new Date(comp.endTime))
   ) || [];
@@ -79,7 +79,7 @@ export default function CompetitionsPage() {
     const durationMs = endDate.getTime() - startDate.getTime();
     const hours = Math.floor(durationMs / (1000 * 60 * 60));
     const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     let result = "";
     if (hours > 0) result += `${hours} hour${hours > 1 ? 's' : ''}`;
     if (minutes > 0) {
@@ -93,7 +93,7 @@ export default function CompetitionsPage() {
   const renderCompetitionCard = (competition: Competition, status: 'upcoming' | 'active' | 'past') => {
     const isRegistered = false; // In a real implementation, this would check if the user is registered
     const isCreator = user && competition.createdBy === user.id;
-    
+
     return (
       <Card key={competition.id} className="mb-4">
         <CardHeader>
@@ -189,10 +189,10 @@ export default function CompetitionsPage() {
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto bg-slate-50 p-4">
           <div className="container mx-auto py-6 max-w-4xl">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
@@ -209,7 +209,7 @@ export default function CompetitionsPage() {
                 </Link>
               )}
             </div>
-            
+
             <Tabs 
               value={activeTab} 
               onValueChange={setActiveTab}
@@ -226,7 +226,7 @@ export default function CompetitionsPage() {
                   Past ({pastCompetitions.length})
                 </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="upcoming" className="mt-4">
                 {isLoadingCompetitions ? (
                   <div className="flex justify-center py-12">
@@ -244,7 +244,7 @@ export default function CompetitionsPage() {
                   )
                 )}
               </TabsContent>
-              
+
               <TabsContent value="active" className="mt-4">
                 {isLoadingCompetitions ? (
                   <div className="flex justify-center py-12">
@@ -262,7 +262,7 @@ export default function CompetitionsPage() {
                   )
                 )}
               </TabsContent>
-              
+
               <TabsContent value="past" className="mt-4">
                 {isLoadingCompetitions ? (
                   <div className="flex justify-center py-12">

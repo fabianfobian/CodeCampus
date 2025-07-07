@@ -99,7 +99,9 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        // Remove password from response
+        const { password, ...userWithoutPassword } = user;
+        res.status(201).json(userWithoutPassword);
       });
     } catch (error) {
       next(error);
@@ -118,7 +120,9 @@ export function setupAuth(app: Express) {
         if (err) {
           return next(err);
         }
-        return res.status(200).json(user);
+        // Remove password from response
+        const { password, ...userWithoutPassword } = user;
+        return res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
   });
@@ -131,8 +135,9 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const { password, ...userWithoutPassword } = req.user;
+    res.json(userWithoutPassword);
   });
 
   // Role-based authorization middleware

@@ -1,324 +1,437 @@
 
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import Sidebar from "@/components/layout/sidebar";
-import Header from "@/components/layout/header";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Search, 
-  Plus, 
-  MessageSquare, 
-  ThumbsUp, 
-  Eye, 
-  Clock,
-  Users,
-  TrendingUp
-} from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MessageSquare, Plus, Search, ThumbsUp, Reply, Clock } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { formatDistanceToNow } from "date-fns";
 
 interface Discussion {
   id: number;
   title: string;
   content: string;
   author: {
+    id: number;
     username: string;
-    avatar?: string;
+    role: string;
   };
   category: string;
-  replies: number;
-  views: number;
-  likes: number;
-  createdAt: string;
-  lastActivity: string;
   tags: string[];
-  isPinned?: boolean;
+  replies: number;
+  likes: number;
+  createdAt: Date;
+  lastActivity: Date;
+  isLiked?: boolean;
 }
 
-// Mock data for discussions
-const MOCK_DISCUSSIONS: Discussion[] = [
+interface NewDiscussion {
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+}
+
+// Sample discussions data
+const sampleDiscussions: Discussion[] = [
   {
     id: 1,
-    title: "How to optimize recursive solutions?",
-    content: "I'm struggling with optimizing recursive algorithms. Any tips on when to use memoization vs iteration?",
-    author: { username: "coder123", avatar: "" },
-    category: "Algorithm Help",
-    replies: 15,
-    views: 234,
-    likes: 8,
-    createdAt: "2024-01-15",
-    lastActivity: "2 hours ago",
-    tags: ["recursion", "optimization", "algorithms"],
-    isPinned: true
+    title: "Best practices for solving dynamic programming problems",
+    content: "I've been struggling with DP problems lately. What are some systematic approaches you recommend for breaking down complex DP problems?",
+    author: {
+      id: 2,
+      username: "coder_mike",
+      role: "learner"
+    },
+    category: "algorithms",
+    tags: ["dynamic-programming", "algorithms", "interview-prep"],
+    replies: 12,
+    likes: 23,
+    createdAt: new Date("2024-01-15T10:30:00Z"),
+    lastActivity: new Date("2024-01-16T14:20:00Z"),
+    isLiked: false
   },
   {
     id: 2,
-    title: "Best practices for handling large datasets",
-    content: "Working with datasets larger than memory. What are the best approaches?",
-    author: { username: "datadev", avatar: "" },
-    category: "Data Structures",
-    replies: 23,
-    views: 456,
-    likes: 12,
-    createdAt: "2024-01-14",
-    lastActivity: "1 day ago",
-    tags: ["data", "performance", "memory"]
+    title: "JavaScript closure concept explanation needed",
+    content: "Can someone explain closures in JavaScript with practical examples? I understand the theory but struggle with real-world applications.",
+    author: {
+      id: 3,
+      username: "js_newbie",
+      role: "learner"
+    },
+    category: "javascript",
+    tags: ["javascript", "closures", "fundamentals"],
+    replies: 8,
+    likes: 15,
+    createdAt: new Date("2024-01-14T16:45:00Z"),
+    lastActivity: new Date("2024-01-15T09:10:00Z"),
+    isLiked: true
   },
   {
     id: 3,
-    title: "Understanding time complexity",
-    content: "Can someone explain why this solution is O(n log n) instead of O(n²)?",
-    author: { username: "student99", avatar: "" },
-    category: "Theory",
-    replies: 7,
-    views: 189,
-    likes: 5,
-    createdAt: "2024-01-13",
-    lastActivity: "3 days ago",
-    tags: ["complexity", "theory", "big-o"]
+    title: "Competitive Programming Tips for Beginners",
+    content: "Starting my competitive programming journey. What platforms do you recommend and how should I structure my practice routine?",
+    author: {
+      id: 4,
+      username: "aspiring_coder",
+      role: "learner"
+    },
+    category: "competitive-programming",
+    tags: ["competitive-programming", "beginner-tips", "practice"],
+    replies: 18,
+    likes: 34,
+    createdAt: new Date("2024-01-13T12:00:00Z"),
+    lastActivity: new Date("2024-01-16T11:30:00Z"),
+    isLiked: false
+  },
+  {
+    id: 4,
+    title: "Code Review: Binary Search Implementation",
+    content: "Could someone review my binary search implementation? I think there might be edge cases I'm missing.",
+    author: {
+      id: 5,
+      username: "debug_master",
+      role: "learner"
+    },
+    category: "code-review",
+    tags: ["binary-search", "algorithms", "code-review"],
+    replies: 6,
+    likes: 9,
+    createdAt: new Date("2024-01-12T20:15:00Z"),
+    lastActivity: new Date("2024-01-14T08:45:00Z"),
+    isLiked: false
   }
 ];
 
-const CATEGORIES = [
-  "All Categories",
-  "Algorithm Help", 
-  "Data Structures",
-  "Theory",
-  "Implementation",
-  "Code Review",
-  "General Discussion"
+const categories = [
+  { value: "algorithms", label: "Algorithms" },
+  { value: "data-structures", label: "Data Structures" },
+  { value: "javascript", label: "JavaScript" },
+  { value: "python", label: "Python" },
+  { value: "competitive-programming", label: "Competitive Programming" },
+  { value: "code-review", label: "Code Review" },
+  { value: "career", label: "Career Advice" },
+  { value: "general", label: "General Discussion" }
 ];
 
-function DiscussionCard({ discussion }: { discussion: Discussion }) {
-  return (
-    <Card className={`mb-4 ${discussion.isPinned ? 'border-amber-200 bg-amber-50' : ''}`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              {discussion.isPinned && (
-                <Badge variant="secondary" className="text-xs">
-                  Pinned
-                </Badge>
-              )}
-              <Badge variant="outline" className="text-xs">
-                {discussion.category}
-              </Badge>
-            </div>
-            <CardTitle className="text-lg font-semibold text-slate-800 hover:text-blue-600 cursor-pointer">
-              {discussion.title}
-            </CardTitle>
-            <p className="text-sm text-slate-600 mt-2 line-clamp-2">
-              {discussion.content}
-            </p>
-            <div className="flex flex-wrap gap-1 mt-2">
-              {discussion.tags.map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  #{tag}
-                </Badge>
-              ))}
-            </div>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 text-sm text-slate-500">
-            <div className="flex items-center gap-1">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-xs">
-                  {discussion.author.username.charAt(0).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span>{discussion.author.username}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Clock className="h-4 w-4" />
-              <span>{discussion.lastActivity}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-slate-500">
-            <div className="flex items-center gap-1">
-              <MessageSquare className="h-4 w-4" />
-              <span>{discussion.replies}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <Eye className="h-4 w-4" />
-              <span>{discussion.views}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <ThumbsUp className="h-4 w-4" />
-              <span>{discussion.likes}</span>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 export default function DiscussionsPage() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [activeTab, setActiveTab] = useState("recent");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("recent");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newDiscussion, setNewDiscussion] = useState<NewDiscussion>({
+    title: "",
+    content: "",
+    category: "",
+    tags: []
+  });
+
+  // In a real app, this would be an API call
+  const { data: discussions = sampleDiscussions, isLoading } = useQuery({
+    queryKey: ["discussions"],
+    queryFn: async () => {
+      // Simulate API call
+      return sampleDiscussions;
+    }
+  });
+
+  const createDiscussionMutation = useMutation({
+    mutationFn: async (discussionData: NewDiscussion) => {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Discussion created!",
+        description: "Your discussion has been posted successfully."
+      });
+      setIsCreateDialogOpen(false);
+      setNewDiscussion({ title: "", content: "", category: "", tags: [] });
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+    },
+    onError: () => {
+      toast({
+        title: "Failed to create discussion",
+        description: "There was an error posting your discussion.",
+        variant: "destructive"
+      });
+    }
+  });
+
+  const likeDiscussionMutation = useMutation({
+    mutationFn: async (discussionId: number) => {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { success: true };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["discussions"] });
+    }
+  });
+
+  const filteredDiscussions = discussions
+    .filter(discussion => {
+      const matchesSearch = discussion.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           discussion.content.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = categoryFilter === "all" || discussion.category === categoryFilter;
+      return matchesSearch && matchesCategory;
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case "recent":
+          return new Date(b.lastActivity).getTime() - new Date(a.lastActivity).getTime();
+        case "popular":
+          return (b.likes + b.replies) - (a.likes + a.replies);
+        case "oldest":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+
+  const handleCreateDiscussion = () => {
+    if (!newDiscussion.title.trim() || !newDiscussion.content.trim() || !newDiscussion.category) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+    createDiscussionMutation.mutate(newDiscussion);
+  };
+
+  const handleLike = (discussionId: number) => {
+    likeDiscussionMutation.mutate(discussionId);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen bg-slate-50">
-      <Sidebar />
-      
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold">Community Discussions</h1>
+          <p className="text-muted-foreground mt-2">
+            Connect with fellow learners and share knowledge
+          </p>
+        </div>
         
-        <main className="flex-1 overflow-y-auto bg-slate-50 p-6">
-          <div className="max-w-6xl mx-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Start Discussion
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Start New Discussion</DialogTitle>
+              <DialogDescription>
+                Share your questions, insights, or start a conversation with the community.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4">
               <div>
-                <h1 className="text-3xl font-bold text-slate-800 mb-2">Discussions</h1>
-                <p className="text-slate-600">
-                  Connect with the community, ask questions, and share knowledge
-                </p>
-              </div>
-              <Button className="flex items-center gap-2">
-                <Plus className="h-4 w-4" />
-                New Discussion
-              </Button>
-            </div>
-
-            {/* Search and Filters */}
-            <div className="flex gap-4 mb-6">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <label className="text-sm font-medium mb-1 block">Title *</label>
                 <Input
-                  placeholder="Search discussions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  placeholder="What's your discussion about?"
+                  value={newDiscussion.title}
+                  onChange={(e) => setNewDiscussion(prev => ({ ...prev, title: e.target.value }))}
                 />
               </div>
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="px-3 py-2 border border-slate-200 rounded-md bg-white text-sm"
-              >
-                {CATEGORIES.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Main Content */}
-              <div className="lg:col-span-3">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="recent">Recent</TabsTrigger>
-                    <TabsTrigger value="popular">Popular</TabsTrigger>
-                    <TabsTrigger value="unanswered">Unanswered</TabsTrigger>
-                    <TabsTrigger value="following">Following</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="recent" className="space-y-4 mt-6">
-                    {MOCK_DISCUSSIONS.map((discussion) => (
-                      <DiscussionCard key={discussion.id} discussion={discussion} />
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Category *</label>
+                <Select
+                  value={newDiscussion.category}
+                  onValueChange={(value) => setNewDiscussion(prev => ({ ...prev, category: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
                     ))}
-                  </TabsContent>
-                  
-                  <TabsContent value="popular" className="space-y-4 mt-6">
-                    {MOCK_DISCUSSIONS
-                      .sort((a, b) => b.likes - a.likes)
-                      .map((discussion) => (
-                        <DiscussionCard key={discussion.id} discussion={discussion} />
-                      ))}
-                  </TabsContent>
-                  
-                  <TabsContent value="unanswered" className="space-y-4 mt-6">
-                    {MOCK_DISCUSSIONS
-                      .filter((d) => d.replies === 0)
-                      .map((discussion) => (
-                        <DiscussionCard key={discussion.id} discussion={discussion} />
-                      ))}
-                  </TabsContent>
-                  
-                  <TabsContent value="following" className="space-y-4 mt-6">
-                    <div className="text-center py-8">
-                      <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-slate-600 mb-2">
-                        No followed discussions yet
-                      </h3>
-                      <p className="text-slate-500">
-                        Follow discussions to see them here
-                      </p>
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                  </SelectContent>
+                </Select>
               </div>
-
-              {/* Sidebar */}
-              <div className="space-y-6">
-                {/* Stats */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Community Stats</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Total Discussions</span>
-                      <span className="font-semibold">1,234</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Active Members</span>
-                      <span className="font-semibold">456</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600">Solved Today</span>
-                      <span className="font-semibold">89</span>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Trending Topics */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <TrendingUp className="h-5 w-5" />
-                      Trending Topics
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {["algorithms", "dynamic-programming", "graphs", "arrays", "recursion"].map((topic) => (
-                        <Badge key={topic} variant="secondary" className="mr-2 mb-2">
-                          #{topic}
-                        </Badge>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Guidelines */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Community Guidelines</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-sm text-slate-600 space-y-2">
-                    <p>• Be respectful and constructive</p>
-                    <p>• Search before posting</p>
-                    <p>• Provide context and examples</p>
-                    <p>• Use clear, descriptive titles</p>
-                    <p>• Tag your posts appropriately</p>
-                  </CardContent>
-                </Card>
+              
+              <div>
+                <label className="text-sm font-medium mb-1 block">Content *</label>
+                <Textarea
+                  placeholder="Share your thoughts, questions, or insights..."
+                  value={newDiscussion.content}
+                  onChange={(e) => setNewDiscussion(prev => ({ ...prev, content: e.target.value }))}
+                  className="min-h-32"
+                />
               </div>
             </div>
-          </div>
-        </main>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateDiscussion}
+                disabled={createDiscussionMutation.isPending}
+              >
+                {createDiscussionMutation.isPending ? "Posting..." : "Post Discussion"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
+
+      {/* Search and Filters */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search discussions..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Categories</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category.value} value={category.value}>
+                    {category.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-full lg:w-48">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="recent">Most Recent</SelectItem>
+                <SelectItem value="popular">Most Popular</SelectItem>
+                <SelectItem value="oldest">Oldest First</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Discussions List */}
+      <div className="space-y-4">
+        {filteredDiscussions.map((discussion) => (
+          <Card key={discussion.id} className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-4">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-lg mb-2 hover:text-primary cursor-pointer">
+                    {discussion.title}
+                  </CardTitle>
+                  <CardDescription className="text-sm mb-3">
+                    {discussion.content.length > 200 
+                      ? `${discussion.content.substring(0, 200)}...` 
+                      : discussion.content}
+                  </CardDescription>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    <Badge variant="secondary">{discussion.category}</Badge>
+                    {discussion.tags.slice(0, 3).map((tag, index) => (
+                      <Badge key={index} variant="outline" className="text-xs">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardHeader>
+            
+            <CardContent className="pt-0">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <Avatar className="h-6 w-6">
+                      <AvatarFallback className="text-xs">
+                        {discussion.author.username.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm text-muted-foreground">
+                      {discussion.author.username}
+                    </span>
+                    <Badge variant="outline" className="text-xs">
+                      {discussion.author.role}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center space-x-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{formatDistanceToNow(discussion.createdAt, { addSuffix: true })}</span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-4">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleLike(discussion.id)}
+                    className={discussion.isLiked ? "text-red-500" : ""}
+                  >
+                    <ThumbsUp className="h-4 w-4 mr-1" />
+                    {discussion.likes}
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <Reply className="h-4 w-4 mr-1" />
+                    {discussion.replies}
+                  </Button>
+                  <Button variant="ghost" size="sm">
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    Reply
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredDiscussions.length === 0 && (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No discussions found matching your criteria.</p>
+            <Button className="mt-4" onClick={() => setIsCreateDialogOpen(true)}>
+              Start the first discussion
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

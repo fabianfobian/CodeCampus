@@ -27,17 +27,15 @@ type SidebarLinkProps = {
 
 const SidebarLink = ({ href, icon, children, active }: SidebarLinkProps) => (
   <li className="mb-1">
-    <Link href={href}>
-      <a
-        className={`flex items-center px-4 py-2 text-sm rounded-md mx-2 ${
-          active
-            ? "bg-sidebar-accent text-sidebar-foreground"
-            : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
-        }`}
-      >
-        <span className="mr-3 text-lg">{icon}</span>
-        {children}
-      </a>
+    <Link href={href}
+      className={`flex items-center px-4 py-2 text-sm rounded-md mx-2 ${
+        active
+          ? "bg-sidebar-accent text-sidebar-foreground"
+          : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      }`}
+    >
+      <span className="mr-3 text-lg">{icon}</span>
+      {children}
     </Link>
   </li>
 );
