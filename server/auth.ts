@@ -6,7 +6,7 @@ import { scrypt, randomBytes, timingSafeEqual } from "crypto";
 import { promisify } from "util";
 import { storage } from "./storage";
 import { User } from "@shared/schema";
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -40,7 +40,9 @@ async function comparePasswords(supplied: string, stored: string) {
 
 export function setupAuth(app: Express) {
   if (!process.env.SESSION_SECRET) {
-    console.warn("No SESSION_SECRET environment variable set, using a default secret");
+    console.warn(
+      "No SESSION_SECRET environment variable set, using a default secret",
+    );
   }
 
   const sessionSettings: session.SessionOptions = {
@@ -51,8 +53,8 @@ export function setupAuth(app: Express) {
     cookie: {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours,
-      sameSite: 'lax'
-    }
+      sameSite: "lax",
+    },
   };
 
   app.set("trust proxy", 1);
@@ -114,7 +116,9 @@ export function setupAuth(app: Express) {
         return next(err);
       }
       if (!user) {
-        return res.status(401).json({ message: "Invalid username or password" });
+        return res
+          .status(401)
+          .json({ message: "Invalid username or password" });
       }
       req.login(user, (err) => {
         if (err) {
@@ -135,7 +139,8 @@ export function setupAuth(app: Express) {
   });
 
   app.get("/api/user", (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    if (!req.isAuthenticated())
+      return res.status(401).json({ message: "Not authenticated" });
     const { password, ...userWithoutPassword } = req.user;
     res.json(userWithoutPassword);
   });
@@ -146,11 +151,11 @@ export function setupAuth(app: Express) {
       if (!req.isAuthenticated()) {
         return res.status(401).json({ message: "Not authenticated" });
       }
-      
+
       if (!roles.includes(req.user.role)) {
         return res.status(403).json({ message: "Not authorized" });
       }
-      
+
       next();
     };
   };
