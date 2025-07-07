@@ -1,11 +1,24 @@
-
+import Sidebar from "@/components/layout/sidebar";
+import Header from "@/components/layout/header";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { LearningPathCard } from "@/components/learning/learning-path-card";
 import { Search, Filter, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
@@ -28,47 +41,64 @@ const sampleLearningPaths: LearningPath[] = [
   {
     id: 1,
     title: "JavaScript Fundamentals",
-    description: "Master the basics of JavaScript programming, from variables to functions and beyond.",
+    description:
+      "Master the basics of JavaScript programming, from variables to functions and beyond.",
     difficulty: "Beginner",
     estimatedTime: "4 weeks",
     progress: 65,
     topics: ["Variables", "Functions", "Objects", "Arrays", "DOM Manipulation"],
     enrolled: 324,
-    createdBy: 1
+    createdBy: 1,
   },
   {
     id: 2,
     title: "Data Structures & Algorithms",
-    description: "Deep dive into essential data structures and algorithms for coding interviews.",
+    description:
+      "Deep dive into essential data structures and algorithms for coding interviews.",
     difficulty: "Intermediate",
     estimatedTime: "8 weeks",
     progress: 30,
-    topics: ["Arrays", "Linked Lists", "Trees", "Graphs", "Sorting", "Dynamic Programming"],
+    topics: [
+      "Arrays",
+      "Linked Lists",
+      "Trees",
+      "Graphs",
+      "Sorting",
+      "Dynamic Programming",
+    ],
     enrolled: 156,
-    createdBy: 1
+    createdBy: 1,
   },
   {
     id: 3,
     title: "Advanced React Patterns",
-    description: "Learn advanced React concepts and patterns used in production applications.",
+    description:
+      "Learn advanced React concepts and patterns used in production applications.",
     difficulty: "Advanced",
     estimatedTime: "6 weeks",
     progress: 0,
-    topics: ["Hooks", "Context", "Higher-Order Components", "Render Props", "Performance"],
+    topics: [
+      "Hooks",
+      "Context",
+      "Higher-Order Components",
+      "Render Props",
+      "Performance",
+    ],
     enrolled: 89,
-    createdBy: 1
+    createdBy: 1,
   },
   {
     id: 4,
     title: "Python for Data Science",
-    description: "Introduction to Python programming with focus on data analysis and visualization.",
+    description:
+      "Introduction to Python programming with focus on data analysis and visualization.",
     difficulty: "Beginner",
     estimatedTime: "5 weeks",
     progress: 0,
     topics: ["Python Basics", "NumPy", "Pandas", "Matplotlib", "Jupyter"],
     enrolled: 267,
-    createdBy: 1
-  }
+    createdBy: 1,
+  },
 ];
 
 export default function LearningPathsPage() {
@@ -85,19 +115,19 @@ export default function LearningPathsPage() {
     queryFn: async () => {
       // Simulate API call
       return sampleLearningPaths;
-    }
+    },
   });
 
   const enrollMutation = useMutation({
     mutationFn: async (pathId: number) => {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       return { success: true };
     },
     onSuccess: () => {
       toast({
         title: "Enrolled successfully!",
-        description: "You have been enrolled in the learning path."
+        description: "You have been enrolled in the learning path.",
       });
       queryClient.invalidateQueries({ queryKey: ["learning-paths"] });
     },
@@ -105,21 +135,26 @@ export default function LearningPathsPage() {
       toast({
         title: "Enrollment failed",
         description: "There was an error enrolling in the learning path.",
-        variant: "destructive"
+        variant: "destructive",
       });
-    }
+    },
   });
 
-  const filteredPaths = learningPaths.filter(path => {
-    const matchesSearch = path.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         path.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesDifficulty = difficultyFilter === "all" || 
-                             path.difficulty.toLowerCase() === difficultyFilter;
-    const matchesProgress = progressFilter === "all" ||
-                           (progressFilter === "not-started" && path.progress === 0) ||
-                           (progressFilter === "in-progress" && path.progress > 0 && path.progress < 100) ||
-                           (progressFilter === "completed" && path.progress === 100);
-    
+  const filteredPaths = learningPaths.filter((path) => {
+    const matchesSearch =
+      path.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      path.description.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesDifficulty =
+      difficultyFilter === "all" ||
+      path.difficulty.toLowerCase() === difficultyFilter;
+    const matchesProgress =
+      progressFilter === "all" ||
+      (progressFilter === "not-started" && path.progress === 0) ||
+      (progressFilter === "in-progress" &&
+        path.progress > 0 &&
+        path.progress < 100) ||
+      (progressFilter === "completed" && path.progress === 100);
+
     return matchesSearch && matchesDifficulty && matchesProgress;
   });
 
@@ -137,14 +172,16 @@ export default function LearningPathsPage() {
 
   return (
     <div className="container mx-auto py-6 space-y-6">
+      <Header />
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <Sidebar />
         <div>
           <h1 className="text-3xl font-bold">Learning Paths</h1>
           <p className="text-muted-foreground mt-2">
             Structured learning journeys to master programming concepts
           </p>
         </div>
-        
+
         {user?.role === "admin" || user?.role === "examiner" ? (
           <Button>
             <Plus className="h-4 w-4 mr-2" />
@@ -169,8 +206,11 @@ export default function LearningPathsPage() {
                 className="pl-10"
               />
             </div>
-            
-            <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+
+            <Select
+              value={difficultyFilter}
+              onValueChange={setDifficultyFilter}
+            >
               <SelectTrigger className="w-full lg:w-48">
                 <SelectValue placeholder="Difficulty" />
               </SelectTrigger>
@@ -218,7 +258,9 @@ export default function LearningPathsPage() {
       {filteredPaths.length === 0 && (
         <Card>
           <CardContent className="py-12 text-center">
-            <p className="text-muted-foreground">No learning paths found matching your criteria.</p>
+            <p className="text-muted-foreground">
+              No learning paths found matching your criteria.
+            </p>
           </CardContent>
         </Card>
       )}
